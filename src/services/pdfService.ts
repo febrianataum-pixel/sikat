@@ -65,7 +65,9 @@ export const generateSpt = (data: {
   // LOGO
   if (data.logoUrl) {
     try {
-      doc.addImage(data.logoUrl, 'PNG', 15, 12, 22, 22, undefined, 'FAST');
+      // Removing 'PNG' format string to let jsPDF auto-detect format, 
+      // preventing "wrong PNG signature" if image is actually JPEG/WEBP
+      doc.addImage(data.logoUrl, 15, 12, 22, 22, undefined, 'FAST');
     } catch (e) {
       console.error("Failed to add logo:", e);
     }
@@ -197,6 +199,275 @@ export const generateSpt = (data: {
   return doc;
 };
 
+export const terbilang = (n: number): string => {
+  if (n < 0) return "Minus " + terbilang(-n);
+  if (n === 0) return "Nol Rupiah";
+  
+  const units = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+  let res = "";
+  
+  if (n < 12) res = units[n];
+  else if (n < 20) res = terbilang(n - 10) + " Belas";
+  else if (n < 100) res = terbilang(Math.floor(n / 10)) + " Puluh " + terbilang(n % 10);
+  else if (n < 200) res = "Seratus " + terbilang(n - 100);
+  else if (n < 1000) res = terbilang(Math.floor(n / 100)) + " Ratus " + terbilang(n % 100);
+  else if (n < 2000) res = "Seribu " + terbilang(n - 1000);
+  else if (n < 1000000) res = terbilang(Math.floor(n / 1000)) + " Ribu " + terbilang(n % 1000);
+  else if (n < 1000000000) res = terbilang(Math.floor(n / 1000000)) + " Juta " + terbilang(n % 1000000);
+  else res = terbilang(Math.floor(n / 1000000000)) + " Miliar " + terbilang(n % 1000000000);
+  
+  res = res.replace(/\s+/g, " ").trim();
+  if (res.endsWith("Rupiah")) return res;
+  return res + " Rupiah";
+};
+
+export const generateRincianBiaya = (data: {
+  nomorSppd?: string;
+  tanggalSpt: string;
+  petugas: {
+    nama: string;
+    tingkatSPPD: string;
+  };
+  rincian: {
+    uraian: string;
+    nominal: number;
+    hari: number;
+  }[];
+  ppk: {
+    nama: string;
+    nip: string;
+  };
+  bendahara: {
+    nama: string;
+    nip: string;
+    jabatan?: string;
+  };
+}) => {
+  const doc = new jsPDF({
+    orientation: 'p',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const total = data.rincian.reduce((acc, curr) => acc + (curr.nominal * curr.hari), 0);
+  const terbilangText = terbilang(total);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('RINCIAN BIAYA PERJALANAN DINAS', 105, 20, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text('Lampiran SPD Nomor', 15, 35);
+  doc.text(':', 55, 35);
+  doc.text(data.nomorSppd || '...........................................', 60, 35);
+
+  doc.text('Tanggal', 15, 41);
+  doc.text(':', 55, 41);
+  const dateArr = data.tanggalSpt.split('-');
+  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const formattedDate = dateArr.length === 3 ? `${dateArr[2]} ${months[parseInt(dateArr[1]) - 1]} ${dateArr[0]}` : data.tanggalSpt;
+  doc.text(formattedDate, 60, 41);
+
+  const tableData = data.rincian.map((item, i) => [
+    i + 1,
+    item.uraian,
+    `Rp ${item.nominal.toLocaleString('id-ID')}`,
+    item.hari,
+    `Rp ${(item.nominal * item.hari).toLocaleString('id-ID')}`,
+    `Tingkat ${data.petugas.tingkatSPPD}`,
+    `${i + 1}.`
+  ]);
+
+  autoTable(doc, {
+    startY: 50,
+    head: [['NO', 'PERINCIAN BIAYA', 'NOMINAL', 'HARI', 'JUMLAH DITERIMA', 'KET', 'TTD']],
+    body: [
+      ...tableData,
+      [{ content: 'JUMLAH', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } }, { content: `Rp ${total.toLocaleString('id-ID')}`, styles: { fontStyle: 'bold' } }, '', '']
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], halign: 'center' },
+    styles: { fontSize: 10, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 10 },
+      2: { halign: 'right' },
+      3: { halign: 'center', cellWidth: 15 },
+      4: { halign: 'right' },
+      5: { halign: 'center' },
+      6: { cellWidth: 15 }
+    }
+  });
+
+  let currentY = (doc as any).lastAutoTable.finalY + 2;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(10);
+  doc.text(`( ${terbilangText} )`, 15, currentY);
+
+  currentY += 15;
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Blora, ${formattedDate}`, 150, currentY, { align: 'right' });
+  
+  currentY += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.text('PERHITUNGAN SPD RAMPUNG', 105, currentY, { align: 'center' });
+  
+  currentY += 10;
+  doc.setFont('helvetica', 'normal');
+  doc.text('ditetapkan Sejumlah', 15, currentY);
+  doc.text(`Rp ${total.toLocaleString('id-ID')}`, 105, currentY);
+  currentY += 6;
+  doc.text('yang telah dibayar semula', 15, currentY);
+  doc.text(`Rp ${total.toLocaleString('id-ID')}`, 105, currentY);
+  currentY += 6;
+  doc.text('sisa kurang / lebih', 15, currentY);
+  doc.text('Rp -', 105, currentY);
+
+  currentY += 15;
+  doc.setFont('helvetica', 'normal');
+  doc.text('PEJABAT PEMBUAT KOMITMEN', 50, currentY, { align: 'center' });
+  doc.text('BENDAHARA PENGELUARAN', 150, currentY, { align: 'center' });
+  currentY += 5;
+  doc.text('PEMBANTU BIDANG SOSIAL', 150, currentY, { align: 'center' });
+
+  currentY += 25;
+  doc.setFont('helvetica', 'bold');
+  doc.text(data.ppk.nama.toUpperCase(), 50, currentY, { align: 'center' });
+  doc.text(data.bendahara.nama.toUpperCase(), 150, currentY, { align: 'center' });
+  
+  currentY += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.text(`NIP. ${data.ppk.nip}`, 50, currentY, { align: 'center' });
+  doc.text(`NIP. ${data.bendahara.nip}`, 150, currentY, { align: 'center' });
+
+  return doc;
+};
+
+export const generateRekapKegiatan = (data: {
+  bulan: string;
+  tahun: string;
+  kegiatan: {
+    nama: string;
+    tanggal: string;
+    tempat: string;
+    uraian: string;
+    hasLaporan: boolean;
+    hasDokumentasi: boolean;
+    hasSppd: boolean;
+  }[];
+  kabid: {
+    nama: string;
+    nip: string;
+    jabatan: string;
+  };
+  pptk: {
+    nama: string;
+    nip: string;
+  };
+}) => {
+  const doc = new jsPDF({
+    orientation: 'l', // Landscape
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const getDayName = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    return days[date.getDay()];
+  };
+
+  const formatDateShort = (dateStr: string) => {
+    const day = getDayName(dateStr);
+    const dateArr = dateStr.split('-');
+    if (dateArr.length !== 3) return dateStr;
+    return `${day}, ${dateArr[2]}-${dateArr[1]}-${dateArr[0]}`;
+  };
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(`REKAP KEGIATAN TAGANA BULAN ${data.bulan.toUpperCase()} TAHUN ${data.tahun}`, 148, 15, { align: 'center' });
+
+  const tableData = data.kegiatan.map((k, i) => [
+    i + 1,
+    k.nama,
+    formatDateShort(k.tanggal),
+    k.tempat,
+    k.uraian,
+    k.hasLaporan ? 'ada' : 'tidak ada',
+    k.hasDokumentasi ? 'ada' : 'tidak ada',
+    k.hasSppd ? 'ada' : 'tidak ada'
+  ]);
+
+  autoTable(doc, {
+    startY: 25,
+    margin: { left: 10, right: 10 },
+    head: [['NO', 'NAMA', 'TANGGAL', 'TEMPAT', 'URAIAN KEGIATAN KEGIATAN', 'CHEKLIS LAPORAN', 'CHECKLIS FOTO', 'SPPD BELAKANG']],
+    body: tableData,
+    theme: 'grid',
+    headStyles: { 
+      fillColor: [255, 255, 255], 
+      textColor: [0, 0, 0], 
+      lineWidth: 0.1, 
+      lineColor: [0, 0, 0], 
+      halign: 'center', 
+      fontSize: 8,
+      fontStyle: 'bold'
+    },
+    styles: { 
+      fontSize: 8, 
+      cellPadding: 2, 
+      lineColor: [0, 0, 0], 
+      lineWidth: 0.1, 
+      textColor: [0, 0, 0],
+      font: 'helvetica'
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 10 },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 40 },
+      4: { cellWidth: 'auto' },
+      5: { halign: 'center', cellWidth: 20 },
+      6: { halign: 'center', cellWidth: 20 },
+      7: { halign: 'center', cellWidth: 20 }
+    }
+  });
+
+  const finalY = (doc as any).lastAutoTable.finalY + 15;
+  const now = new Date();
+  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const today = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  
+  // Right side (Penyelenggara)
+  doc.text(`Blora,   ${today}`, 230, finalY);
+  doc.text('Penyelenggara,', 230, finalY + 5);
+  doc.text('Pejabat Pelaksana Teknis Kegiatan', 230, finalY + 10);
+  
+  // Left side (Mengetahui)
+  doc.text('Mengetahui,', 25, finalY);
+  doc.text(data.kabid.jabatan, 25, finalY + 5);
+
+  const sigY = finalY + 30;
+  
+  // Kabid
+  doc.setFont('helvetica', 'bold');
+  doc.text(data.kabid.nama, 25, sigY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`NIP. ${data.kabid.nip}`, 25, sigY + 5);
+
+  // PPTK
+  doc.setFont('helvetica', 'bold');
+  doc.text(data.pptk.nama, 230, sigY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`NIP. ${data.pptk.nip}`, 230, sigY + 5);
+
+  return doc;
+};
+
 export const generateSppdDepan = (data: SppdData) => {
   const doc = new jsPDF({
     orientation: 'p',
@@ -207,7 +478,7 @@ export const generateSppdDepan = (data: SppdData) => {
   // LOGO
   if (data.logoUrl) {
     try {
-      doc.addImage(data.logoUrl, 'PNG', 15, 12, 22, 22, undefined, 'FAST');
+      doc.addImage(data.logoUrl, 15, 12, 22, 22, undefined, 'FAST');
     } catch (e) {
       console.error("Failed to add logo to PDF:", e);
     }

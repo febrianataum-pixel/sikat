@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate, cn } from '../lib/utils';
-import { generateSppdDepan, generateSpt } from '../services/pdfService';
+import { generateSppdDepan, generateSpt, generateRincianBiaya } from '../services/pdfService';
 import { DEFAULT_LOGO } from '../constants';
 
 interface Petugas {
@@ -43,7 +43,11 @@ interface Kegiatan {
   hasLaporan: boolean;
   hasDokumentasi: boolean;
   hasSppd: boolean;
-  laporanSelesai: boolean; // Computed or manually set for overall status
+  laporanSelesai: boolean;
+  createdAt: string;
+  updatedAt: string;
+  jenisWilayah?: 'Luar Daerah' | 'Dalam Daerah';
+  biayaTransport?: number;
 }
 
 interface SubKegiatan {
@@ -70,6 +74,8 @@ export default function KegiatanPage() {
   const [settings, setSettings] = useState<{ logoUrl: string, dasarHukum: string[] } | null>(null);
   const [manajemen, setManajemen] = useState<{ id: string, nama: string, nip: string, jabatan: string }[]>([]);
   const [subKegiatan, setSubKegiatan] = useState<SubKegiatan[]>([]);
+  const [biayaPerjalanan, setBiayaPerjalanan] = useState<{ id: string, tingkat: string, jenis: string, nominal: number }[]>([]);
+  const [bbm, setBbm] = useState<{ id: string, jenis: string, harga: number }[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -78,12 +84,14 @@ export default function KegiatanPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pSnap, kSnap, sSnap, mSnap, subSnap] = await Promise.all([
+      const [pSnap, kSnap, sSnap, mSnap, subSnap, bSnap, bbmSnap] = await Promise.all([
         getDocs(collection(db, 'petugas')),
         getDocs(query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc'))),
         getDocs(collection(db, 'settings')),
         getDocs(collection(db, 'manajemen')),
-        getDocs(collection(db, 'sub_kegiatan'))
+        getDocs(collection(db, 'sub_kegiatan')),
+        getDocs(collection(db, 'biaya_perjalanan')),
+        getDocs(collection(db, 'bahan_bakar'))
       ]);
 
       setPetugas(pSnap.docs.map(doc => ({ 
@@ -106,6 +114,8 @@ export default function KegiatanPage() {
 
       setManajemen(mSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
       setSubKegiatan(subSnap.docs.map(d => ({ id: d.id, ...d.data() } as SubKegiatan)));
+      setBiayaPerjalanan(bSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+      setBbm(bbmSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
     } catch (err) {
       console.error("Fetch data error:", err);
     } finally {
@@ -146,6 +156,8 @@ export default function KegiatanPage() {
         hasDokumentasi: !!currentKegiatan.hasDokumentasi,
         hasSppd: !!currentKegiatan.hasSppd,
         laporanSelesai: isComplete,
+        jenisWilayah: currentKegiatan.jenisWilayah || 'Luar Daerah',
+        biayaTransport: currentKegiatan.biayaTransport || 0,
         updatedAt: new Date().toISOString()
       };
 
@@ -167,11 +179,32 @@ export default function KegiatanPage() {
     }
   };
 
+  const calculateRincian = (k: Kegiatan) => {
+    const p = petugas.find(item => item.id === k.petugasId);
+    if (!p) return null;
+
+    const jenis = k.jenisWilayah || 'Luar Daerah';
+    const tingkat = (p as any).tingkatSPPD || 'Non ASN';
+    
+    // Find daily allowance
+    const dailyAllowance = biayaPerjalanan.find(b => 
+      b.tingkat.includes(tingkat.replace('Tingkat ', '')) && b.jenis === jenis
+    )?.nominal || 0;
+
+    const items = [
+      { uraian: 'Uang Harian', nominal: dailyAllowance, hari: 1 },
+      { uraian: 'Uang Transport / BBM', nominal: k.biayaTransport || 0, hari: 1 }
+    ];
+
+    return items.filter(item => item.nominal > 0);
+  };
+
   const handleDownloadDoc = (k: Kegiatan, label: string) => {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return;
 
     const ppkOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('PPK')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'PEJABAT PEMBUAT KOMITMEN' };
+    const bendaharaOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('BENDAHARA')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'BENDAHARA PENGELUARAN PEMBANTU' };
 
     let doc;
     if (label === 'sppd_depan') {
@@ -218,6 +251,28 @@ export default function KegiatanPage() {
         }
       });
       doc.save(`SPT_${k.petugasNama}_${k.tanggal}.pdf`);
+    } else if (label === 'biaya') {
+      const rincian = calculateRincian(k);
+      if (!rincian) return;
+
+      doc = generateRincianBiaya({
+        nomorSppd: k.nomor,
+        tanggalSpt: k.tanggal,
+        petugas: {
+          nama: k.petugasNama,
+          tingkatSPPD: (p as any).tingkatSPPD || '-'
+        },
+        rincian: rincian,
+        ppk: {
+          nama: ppkOfficial.nama,
+          nip: ppkOfficial.nip
+        },
+        bendahara: {
+          nama: bendaharaOfficial.nama,
+          nip: bendaharaOfficial.nip
+        }
+      });
+      doc.save(`RINCIAN_${k.petugasNama}_${k.tanggal}.pdf`);
     } else {
       alert(`Sedang menyiapkan dokumen: ${label}`);
     }
@@ -228,9 +283,11 @@ export default function KegiatanPage() {
     if (!p) return;
 
     const ppkOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('PPK')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'PEJABAT PEMBUAT KOMITMEN' };
+    const bendaharaOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('BENDAHARA')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'BENDAHARA PENGELUARAN PEMBANTU' };
 
     let doc;
     if (type === 'sppd') {
+      setPreviewType('sppd');
       doc = generateSppdDepan({
         nomorSppd: k.nomor,
         petugas: {
@@ -252,6 +309,7 @@ export default function KegiatanPage() {
         subKegiatan: subKegiatan.find(s => s.id === k.subKegiatanId)?.nama
       });
     } else if (type === 'spt') {
+      setPreviewType('spt');
       const kadisOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA DINAS')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Kepala Dinas' };
       doc = generateSpt({
         nomorSpt: k.nomor,
@@ -272,25 +330,27 @@ export default function KegiatanPage() {
           pangkat: (kadisOfficial as any).pangkat || '-'
         }
       });
-    } else {
-      // Temporary placeholder for other types using refined layout
-      doc = generateSppdDepan({
+    } else if (type === 'biaya') {
+      setPreviewType('biaya');
+      const rincian = calculateRincian(k);
+      if (!rincian) return;
+
+      doc = generateRincianBiaya({
+        nomorSppd: k.nomor,
+        tanggalSpt: k.tanggal,
         petugas: {
           nama: k.petugasNama,
-          nip: (p as any).nip || '-',
-          pangkat: (p as any).pangkat || '-',
-          jabatan: (p as any).jenis || '-',
           tingkatSPPD: (p as any).tingkatSPPD || '-'
         },
+        rincian: rincian,
         ppk: {
           nama: ppkOfficial.nama,
-          nip: ppkOfficial.nip,
-          jabatan: ppkOfficial.jabatan
+          nip: ppkOfficial.nip
         },
-        tanggal: formatDate(k.tanggal),
-        tempat: k.tempat,
-        uraian: `[DOKUMEN ${type.toUpperCase()} SEDANG DISIAPKAN]\n` + k.uraian,
-        logoUrl: settings?.logoUrl
+        bendahara: {
+          nama: bendaharaOfficial.nama,
+          nip: bendaharaOfficial.nip
+        }
       });
     }
 
@@ -530,6 +590,33 @@ export default function KegiatanPage() {
                         return <option key={year} value={year}>{year}</option>
                       })}
                     </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Wilayah Tugas *</label>
+                    <select
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-bold"
+                      value={currentKegiatan?.jenisWilayah || 'Luar Daerah'}
+                      onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, jenisWilayah: e.target.value as any })}
+                    >
+                      <option value="Luar Daerah">Luar Daerah</option>
+                      <option value="Dalam Daerah">Dalam Daerah</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nominal Transport (Optional)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                      <input
+                        type="number"
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm"
+                        placeholder="0"
+                        value={currentKegiatan?.biayaTransport || ''}
+                        onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, biayaTransport: Number(e.target.value) })}
+                      />
+                    </div>
                   </div>
                 </div>
 

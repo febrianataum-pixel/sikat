@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Filter, Download, FileSpreadsheet, FileIcon as FilePdf } from 'lucide-react';
-import { formatDate } from '../lib/utils';
+import { Filter, Download, FileSpreadsheet, FileIcon as FilePdf, Check, X } from 'lucide-react';
+import { cn, formatDate } from '../lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { generateRekapKegiatan } from '../services/pdfService';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -26,11 +27,33 @@ interface Kegiatan {
   tempat: string;
   uraian: string;
   laporanSelesai: boolean;
+  hasLaporan: boolean;
+  hasDokumentasi: boolean;
+  hasSppd: boolean;
+}
+
+interface Manajemen {
+  id: string;
+  nama: string;
+  nip: string;
+  jabatan: string;
+}
+
+function CheckStatus({ active }: { active: boolean }) {
+  return (
+    <div className={cn(
+      "inline-flex items-center justify-center w-5 h-5 rounded-full",
+      active ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-300"
+    )}>
+      {active ? <Check size={12} /> : <X size={12} />}
+    </div>
+  );
 }
 
 export default function LaporanPage() {
   const [petugas, setPetugas] = useState<Petugas[]>([]);
   const [data, setData] = useState<Kegiatan[]>([]);
+  const [manajemen, setManajemen] = useState<Manajemen[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Filters
@@ -39,16 +62,25 @@ export default function LaporanPage() {
   const [year, setYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
-    fetchPetugas();
+    fetchInitialData();
   }, []);
 
-  const fetchPetugas = async () => {
-    const snap = await getDocs(collection(db, 'petugas'));
-    setPetugas(snap.docs.map(doc => ({ 
+  const fetchInitialData = async () => {
+    const [pSnap, mSnap] = await Promise.all([
+      getDocs(collection(db, 'petugas')),
+      getDocs(collection(db, 'manajemen'))
+    ]);
+    
+    setPetugas(pSnap.docs.map(doc => ({ 
       id: doc.id, 
       nama: doc.data().nama,
       niat: doc.data().niat
     })));
+
+    setManajemen(mSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Manajemen)));
   };
 
   const handleFilter = async () => {
@@ -78,46 +110,56 @@ export default function LaporanPage() {
   };
 
   const exportToPDF = () => {
-    const doc = new jsPDF();
-    const petugasNama = petugas.find(p => p.id === selectedPetugas)?.nama || 'Semua Petugas';
+    const kabid = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA BIDANG SOSIAL')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Plt. Kepala Bidang Sosial' };
+    const pptk = manajemen.find(m => m.jabatan.toUpperCase().includes('PPTK')) || manajemen.find(m => m.jabatan.toUpperCase().includes('PPK')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Pejabat Pelaksana Teknis Kegiatan' };
+
+    const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     
-    doc.setFontSize(18);
-    doc.text('SIKAT - Laporan Kegiatan Harian', 14, 22);
-    doc.setFontSize(11);
-    doc.text(`Petugas: ${petugasNama}`, 14, 30);
-    doc.text(`Periode: ${month}/${year}`, 14, 36);
-
-    const tableData = data.map(item => [
-      formatDate(item.tanggal),
-      item.tempat,
-      item.uraian,
-      item.laporanSelesai ? 'Selesai' : 'Proses'
-    ]);
-
-    doc.autoTable({
-      startY: 45,
-      head: [['Tanggal', 'Tempat', 'Uraian Kegiatan', 'Status']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246] }
+    const doc = generateRekapKegiatan({
+      bulan: monthNames[Number(month) - 1],
+      tahun: String(year),
+      kegiatan: data.map(k => ({
+        nama: k.petugasNama,
+        tanggal: k.tanggal,
+        tempat: k.tempat,
+        uraian: k.uraian,
+        hasLaporan: k.hasLaporan || k.laporanSelesai,
+        hasDokumentasi: k.hasDokumentasi,
+        hasSppd: k.hasSppd
+      })),
+      kabid: {
+        nama: kabid.nama,
+        nip: kabid.nip,
+        jabatan: kabid.jabatan
+      },
+      pptk: {
+        nama: pptk.nama,
+        nip: pptk.nip
+      }
     });
 
-    doc.save(`Laporan_Kegiatan_${petugasNama}_${month}_${year}.pdf`);
+    const petugasNama = petugas.find(p => p.id === selectedPetugas)?.nama || 'Rekap_Gabungan';
+    doc.save(`Rekap_Kegiatan_${petugasNama}_${month}_${year}.pdf`);
   };
 
   const exportToExcel = () => {
-    const tableData = data.map(item => ({
-      'Nama Petugas': item.petugasNama,
-      'Tanggal': formatDate(item.tanggal),
-      'Tempat': item.tempat,
-      'Uraian': item.uraian,
-      'Status': item.laporanSelesai ? 'Lengkap' : 'Belum Lengkap'
+    const tableData = data.map((item, i) => ({
+      'NO': i + 1,
+      'NAMA': item.petugasNama,
+      'TANGGAL': formatDate(item.tanggal),
+      'TEMPAT': item.tempat,
+      'URAIAN KEGIATAN': item.uraian,
+      'CHEKLIS LAPORAN': (item.hasLaporan || item.laporanSelesai) ? 'ada' : 'tidak ada',
+      'CHECKLIS FOTO': item.hasDokumentasi ? 'ada' : 'tidak ada',
+      'SPPD BELAKANG': item.hasSppd ? 'ada' : 'tidak ada'
     }));
 
     const ws = XLSX.utils.json_to_sheet(tableData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Kegiatan');
-    XLSX.writeFile(wb, `Laporan_SIKAT_${month}_${year}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Rekap Kegiatan');
+    
+    const petugasNama = petugas.find(p => p.id === selectedPetugas)?.nama || 'Rekap_Gabungan';
+    XLSX.writeFile(wb, `Rekap_Kegiatan_${petugasNama}_${month}_${year}.xlsx`);
   };
 
   return (
@@ -205,20 +247,31 @@ export default function LaporanPage() {
               <tr>
                 <th className="px-6 py-3">Nama Petugas</th>
                 <th className="px-6 py-3">Tanggal</th>
-                <th className="px-6 py-3">Lokasi</th>
-                <th className="px-6 py-3">Uraian Tugas</th>
+                <th className="px-6 py-3 text-center">Laporan</th>
+                <th className="px-6 py-3 text-center">Foto</th>
+                <th className="px-6 py-3 text-center">SPPD</th>
                 <th className="px-6 py-3 text-right">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-sm text-slate-600">
               {data.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">Gunakan filter di atas untuk menarik data laporan bulanan.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">Gunakan filter di atas untuk menarik data laporan bulanan.</td></tr>
               ) : data.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-semibold text-slate-800">{item.petugasNama}</td>
-                  <td className="px-6 py-4">{formatDate(item.tanggal)}</td>
-                  <td className="px-6 py-4 font-medium">{item.tempat}</td>
-                  <td className="px-6 py-4 text-slate-500 italic max-w-sm truncate">"{item.uraian}"</td>
+                  <td className="px-6 py-4">
+                    <p className="font-medium text-slate-700">{formatDate(item.tanggal)}</p>
+                    <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{item.tempat}</p>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <CheckStatus active={item.hasLaporan || item.laporanSelesai} />
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <CheckStatus active={item.hasDokumentasi} />
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <CheckStatus active={item.hasSppd} />
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                       item.laporanSelesai ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'
