@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "Petugas": {
+      "title": "Petugas",
+      "description": "Data petugas TKSK dan TAGANA",
+      "type": "object",
+      "properties": {
+        "nama": { "type": "string", "description": "Nama lengkap petugas" },
+        "niat": { "type": "string", "description": "Nomor Induk Anggota Tagana / TKSK" },
+        "tingkatSPPD": { "type": "string", "description": "Tingkat/Golongan SPPD" },
+        "jenis": { "type": "string", "enum": ["TKSK", "TAGANA"], "description": "Kategori petugas" },
+        "kontak": { "type": "string", "description": "Nomor WhatsApp atau telepon" },
+        "keterangan": { "type": "string", "description": "Catatan tambahan" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["nama", "jenis"]
+    },
+    "Kegiatan": {
+      "title": "Kegiatan",
+      "description": "Log kegiatan harian petugas",
+      "type": "object",
+      "properties": {
+        "petugasId": { "type": "string", "description": "ID referensi ke petugas" },
+        "petugasNama": { "type": "string", "description": "Nama petugas (untuk pencarian cepat)" },
+        "tanggal": { "type": "string", "format": "date", "description": "Tanggal pelaksanaan kegiatan" },
+        "tempat": { "type": "string", "description": "Lokasi kegiatan" },
+        "uraian": { "type": "string", "description": "Deskripsi lengkap kegiatan" },
+        "hasLaporan": { "type": "boolean", "description": "Verifikasi Laporan" },
+        "hasDokumentasi": { "type": "boolean", "description": "Verifikasi Dokumentasi" },
+        "hasSppd": { "type": "boolean", "description": "Verifikasi SPPD Belakang" },
+        "laporanSelesai": { "type": "boolean", "description": "Status kelengkapan keseluruhan" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["petugasId", "tanggal", "tempat", "uraian"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Profil pengguna sistem",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff"] },
+        "name": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "petugas": {
+      "schema": "Petugas",
+      "description": "Koleksi data petugas"
+    },
+    "kegiatan": {
+      "schema": "Kegiatan",
+      "description": "Koleksi data kegiatan harian"
+    },
+    "users": {
+        "schema": "User",
+        "description": "Data profil pengguna"
+    },
+    "settings": {
+      "schema": "object",
+      "description": "Pengaturan umum aplikasi (Logo, Dasar Hukum)"
+    },
+    "sub_kegiatan": {
+      "schema": "object",
+      "description": "Daftar kode dan nama sub kegiatan"
+    },
+    "biaya_perjalanan": {
+      "schema": "object",
+      "description": "Standar biaya berdasarkan tingkat dan jenis wilayah"
+    },
+    "bahan_bakar": {
+      "schema": "object",
+      "description": "Daftar harga BBM per liter"
+    },
+    "manajemen": {
+      "schema": "object",
+      "description": "Daftar pejabat penandatangan dokumen (PPK, dll)"
+    }
+  }
+}

@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. Validation Blueprints
+    function isValidPetugas(data) {
+      return data.nama is string && data.nama.size() > 0 &&
+             data.jenis in ['TKSK', 'TAGANA'];
+    }
+
+    function isValidKegiatan(data) {
+      return data.petugasId is string &&
+             data.tanggal is string &&
+             data.tempat is string &&
+             data.uraian is string;
+    }
+
+    // Petugas rules
+    match /petugas/{petugasId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Kegiatan rules
+    match /kegiatan/{kegiatanId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Settings rules
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn(); // In production, restrict this to admins
+    }
+
+    // Sub Kegiatan rules
+    match /sub_kegiatan/{subId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Biaya Perjalanan rules
+    match /biaya_perjalanan/{biayaId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Bahan Bakar rules
+    match /bahan_bakar/{bbmId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Manajemen rules
+    match /manajemen/{pejabatId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Health check / Connection test
+    match /test/{docId} {
+      allow read: if true; // Allow public read for connectivity test
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+    }
+  }
+}
+
