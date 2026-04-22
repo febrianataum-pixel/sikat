@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { DEFAULT_LOGO } from '../constants';
 
 type UtilityTab = 'umum' | 'sub_kegiatan' | 'biaya' | 'bbm' | 'bendahara';
 
@@ -32,7 +33,7 @@ export default function UtilitasPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form States
-  const [settings, setSettings] = useState({ logoUrl: '', dasarHukum: [] as string[] });
+  const [settings, setSettings] = useState({ logoUrl: DEFAULT_LOGO, dasarHukum: [] as string[] });
   const [newDasarHukum, setNewDasarHukum] = useState('');
   const [isAddingDasarHukum, setIsAddingDasarHukum] = useState(false);
   const [subKegiatan, setSubKegiatan] = useState<{id?: string, kode: string, nama: string}[]>([]);
@@ -58,7 +59,7 @@ export default function UtilitasPage() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setSettings({ 
-            logoUrl: data.logoUrl || '', 
+            logoUrl: data.logoUrl || DEFAULT_LOGO, 
             dasarHukum: Array.isArray(data.dasarHukum) ? data.dasarHukum : [] 
           });
         } else {
@@ -67,7 +68,7 @@ export default function UtilitasPage() {
           if (!snap.empty) {
              const data = snap.docs[0].data();
              setSettings({ 
-               logoUrl: data.logoUrl || '', 
+               logoUrl: data.logoUrl || DEFAULT_LOGO, 
                dasarHukum: Array.isArray(data.dasarHukum) ? data.dasarHukum : [] 
              });
           }
@@ -117,7 +118,11 @@ export default function UtilitasPage() {
       const storageRef = ref(storage, `logo/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file).catch(storErr => {
         console.error("Storage upload error details:", storErr);
-        throw new Error("Gagal mengunggah ke Storage. Periksa aturan keamanan (Rules).");
+        // Providing more descriptive error for the user to troubleshoot
+        const msg = storErr?.code === 'storage/unauthorized' 
+          ? "Izin ditolak (Unauthorized). Pastikan 'Storage Rules' di Firebase Console sudah diatur ke 'read/write'." 
+          : `Gagal mengunggah (${storErr?.code || 'Error'}). Pastikan Firebase Storage sudah aktif di Console.`;
+        throw new Error(msg);
       });
       const url = await getDownloadURL(snapshot.ref);
       

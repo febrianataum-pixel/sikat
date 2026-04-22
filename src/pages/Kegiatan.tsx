@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate, cn } from '../lib/utils';
 import { generateSppdDepan, generateSpt } from '../services/pdfService';
+import { DEFAULT_LOGO } from '../constants';
 
 interface Petugas {
   id: string;
@@ -98,7 +99,7 @@ export default function KegiatanPage() {
       if (!sSnap.empty) {
         const data = sSnap.docs.find(d => d.id === 'general')?.data() || sSnap.docs[0].data();
         setSettings({ 
-          logoUrl: data.logoUrl || '', 
+          logoUrl: data.logoUrl || DEFAULT_LOGO, 
           dasarHukum: Array.isArray(data.dasarHukum) ? data.dasarHukum : [] 
         });
       }
