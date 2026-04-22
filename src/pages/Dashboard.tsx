@@ -17,15 +17,15 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const petugasSnap = await getDocs(collection(db, 'petugas'));
-        const kegiatanSnap = await getDocs(query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc'), limit(5)));
+        const [petugasSnap, recentReq, allKegiatan] = await Promise.all([
+          getDocs(collection(db, 'petugas')),
+          getDocs(query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc'), limit(5))),
+          getDocs(collection(db, 'kegiatan'))
+        ]);
         
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         
-        // This is a simplified client-side stat calculation for demo
-        // In production, use Firebase Functions or proper queries
-        const allKegiatan = await getDocs(collection(db, 'kegiatan'));
         let thisMonthCount = 0;
         let pendingLaporan = 0;
         
@@ -43,9 +43,9 @@ export default function Dashboard() {
           laporanPending: pendingLaporan
         });
 
-        setRecentActivities(kegiatanSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setRecentActivities(recentReq.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
-        console.error(err);
+        console.error("Dashboard fetch error:", err);
       } finally {
         setLoading(false);
       }

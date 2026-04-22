@@ -75,7 +75,14 @@ export default function KegiatanPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const pSnap = await getDocs(collection(db, 'petugas'));
+      const [pSnap, kSnap, sSnap, mSnap, subSnap] = await Promise.all([
+        getDocs(collection(db, 'petugas')),
+        getDocs(query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc'))),
+        getDocs(collection(db, 'settings')),
+        getDocs(collection(db, 'manajemen')),
+        getDocs(collection(db, 'sub_kegiatan'))
+      ]);
+
       setPetugas(pSnap.docs.map(doc => ({ 
         id: doc.id, 
         nama: doc.data().nama, 
@@ -84,11 +91,8 @@ export default function KegiatanPage() {
         jenis: doc.data().jenis
       })));
 
-      const kSnap = await getDocs(query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc')));
       setKegiatan(kSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kegiatan)));
 
-      // Fetch settings
-      const sSnap = await getDocs(collection(db, 'settings'));
       if (!sSnap.empty) {
         const data = sSnap.docs.find(d => d.id === 'general')?.data() || sSnap.docs[0].data();
         setSettings({ 
@@ -97,15 +101,10 @@ export default function KegiatanPage() {
         });
       }
 
-      // Fetch manajemen
-      const mSnap = await getDocs(collection(db, 'manajemen'));
       setManajemen(mSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
-
-      // Fetch sub_kegiatan
-      const subSnap = await getDocs(collection(db, 'sub_kegiatan'));
       setSubKegiatan(subSnap.docs.map(d => ({ id: d.id, ...d.data() } as SubKegiatan)));
     } catch (err) {
-      console.error(err);
+      console.error("Fetch data error:", err);
     } finally {
       setLoading(false);
     }
