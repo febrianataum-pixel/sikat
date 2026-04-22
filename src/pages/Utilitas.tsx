@@ -304,9 +304,10 @@ export default function UtilitasPage() {
                           src={settings.logoUrl} 
                           className="w-full h-full object-contain p-2" 
                           referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            console.error("Image load error:", e);
-                            e.currentTarget.src = "https://placehold.co/100x100?text=Error+Loading";
+                          onError={() => {
+                            console.error("Image load error for logoUrl");
+                            // Fallback to placeholder if image fails to load
+                            setSettings(prev => ({ ...prev, logoUrl: "https://placehold.co/100x100?text=Error+Loading" }));
                           }}
                         />
                       ) : (

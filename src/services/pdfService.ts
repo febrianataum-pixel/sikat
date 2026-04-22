@@ -65,9 +65,9 @@ export const generateSpt = (data: {
   // LOGO
   if (data.logoUrl) {
     try {
-      // Removing 'PNG' format string to let jsPDF auto-detect format, 
-      // preventing "wrong PNG signature" if image is actually JPEG/WEBP
-      doc.addImage(data.logoUrl, 15, 12, 22, 22, undefined, 'FAST');
+      // Use undefined for the format to let jsPDF auto-detect based on signature.
+      // This prevents "wrong PNG signature" errors if image is actually JPEG/WEBP.
+      doc.addImage(data.logoUrl, undefined as any, 15, 12, 22, 22, undefined, 'FAST');
     } catch (e) {
       console.error("Failed to add logo:", e);
     }
@@ -478,7 +478,7 @@ export const generateSppdDepan = (data: SppdData) => {
   // LOGO
   if (data.logoUrl) {
     try {
-      doc.addImage(data.logoUrl, 15, 12, 22, 22, undefined, 'FAST');
+      doc.addImage(data.logoUrl, undefined as any, 15, 12, 22, 22, undefined, 'FAST');
     } catch (e) {
       console.error("Failed to add logo to PDF:", e);
     }
