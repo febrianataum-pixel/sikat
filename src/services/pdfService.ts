@@ -23,6 +23,177 @@ interface SppdData {
   subKegiatan?: string;
 }
 
+export const generateSpt = (data: {
+  nomorSpt?: string;
+  dasarHukum: string[];
+  petugas: {
+    nama: string;
+    nip?: string;
+    pangkat?: string;
+    jabatan?: string;
+  };
+  maksud: string;
+  tempat: string;
+  tanggal: string;
+  logoUrl?: string;
+  kadis: {
+    nama: string;
+    nip: string;
+    pangkat: string;
+  };
+}) => {
+  const doc = new jsPDF({
+    orientation: 'p',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const getDayName = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    return days[date.getDay()];
+  };
+
+  const formatDateWithDay = (dateStr: string) => {
+    const day = getDayName(dateStr);
+    const dateArr = dateStr.split('-'); // YYYY-MM-DD
+    if (dateArr.length !== 3) return dateStr;
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    return `${day}, ${dateArr[2]} ${months[parseInt(dateArr[1]) - 1]} ${dateArr[0]}`;
+  };
+
+  // LOGO
+  if (data.logoUrl) {
+    try {
+      doc.addImage(data.logoUrl, 'PNG', 15, 12, 22, 22, undefined, 'FAST');
+    } catch (e) {
+      console.error("Failed to add logo:", e);
+    }
+  }
+
+  // KOP SURAT
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('PEMERINTAH KABUPATEN BLORA', 105, 15, { align: 'center' });
+  doc.setFontSize(14);
+  doc.text('DINAS SOSIAL PEMBERDAYAAN PEREMPUAN', 105, 21, { align: 'center' });
+  doc.text('DAN PERLINDUNGAN ANAK', 105, 27, { align: 'center' });
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Jl. Pemuda No.16 A Telp / Fax (0296) 5298541 BLORA - 58215', 105, 32, { align: 'center' });
+  doc.text('Website : dinsos.blorakab.go.id / E-mail : dinsosp3a.bla@gmail.com', 105, 36, { align: 'center' });
+
+  // LINE
+  doc.setLineWidth(0.8);
+  doc.line(15, 40, 195, 40);
+  doc.setLineWidth(0.3);
+  doc.line(15, 41, 195, 41);
+
+  // JUDUL
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('SURAT PERINTAH TUGAS', 105, 50, { align: 'center' });
+  const textWidth = doc.getTextWidth('SURAT PERINTAH TUGAS');
+  doc.line(105 - textWidth/2, 51, 105 + textWidth/2, 51);
+  
+  const currentYear = new Date().getFullYear();
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Nomor : ${data.nomorSpt || '000.1.2.3'} /                / ${currentYear}`, 105, 56, { align: 'center' });
+
+  let currentY = 70;
+
+  // DASAR
+  doc.setFont('helvetica', 'normal');
+  doc.text('Dasar              :', 15, currentY);
+  
+  const dasars = data.dasarHukum.length > 0 ? data.dasarHukum : ['Kepentingan Dinas.'];
+  dasars.forEach((dasar, i) => {
+    const text = `${i + 1}. ${dasar}`;
+    const lines = doc.splitTextToSize(text, 145);
+    doc.text(lines, 40, currentY);
+    currentY += (lines.length * 5) + 2;
+  });
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('MENUGASKAN', 105, currentY + 5, { align: 'center' });
+  currentY += 15;
+
+  // KEPADA
+  doc.setFont('helvetica', 'normal');
+  doc.text('Kepada          :', 15, currentY);
+  
+  // Member 1 (Always at least one)
+  doc.text('1.  Nama', 40, currentY);
+  doc.text(`: ${data.petugas.nama}`, 70, currentY);
+  currentY += 5;
+  doc.text('    Pangkat/Gol', 40, currentY);
+  doc.text(`: ${data.petugas.pangkat || '-'}`, 70, currentY);
+  currentY += 5;
+  doc.text('    NIP', 40, currentY);
+  doc.text(`: ${data.petugas.nip || '-'}`, 70, currentY);
+  currentY += 5;
+  doc.text('    Jabatan', 40, currentY);
+  doc.text(`: ${data.petugas.jabatan || '-'}`, 70, currentY);
+  
+  currentY += 10;
+
+  // UNTUK
+  doc.text('Untuk            :', 15, currentY);
+  doc.text('1.  Maksud Perjalanan', 40, currentY);
+  const maksudLines = doc.splitTextToSize(`: ${data.maksud}`, 120);
+  doc.text(maksudLines, 70, currentY);
+  currentY += (maksudLines.length * 5) + 2;
+
+  doc.text('    Tempat', 40, currentY);
+  doc.text(`: ${data.tempat}`, 70, currentY);
+  currentY += 5;
+
+  doc.text('    Hari/Tanggal', 40, currentY);
+  doc.text(`: ${formatDateWithDay(data.tanggal)}`, 70, currentY);
+  currentY += 10;
+
+  doc.text('2.  Melaporkan hasil pelaksanaan tugas kepada pemberi tugas;', 40, currentY);
+  currentY += 5;
+  doc.text('3.  Perintah itu dilaksanakan dengan penuh tanggung jawab;', 40, currentY);
+  currentY += 5;
+  doc.text('4.  Biaya perjalanan dinas diberikan sesuai ketentuan yang berlaku;', 40, currentY);
+  currentY += 5;
+  doc.text('5.  Apabila terdapat kekeliruan dalam Surat Perintah Tugas ini akan diadakan', 40, currentY);
+  currentY += 5;
+  doc.text('    perbaikan sebagaimana mestinya.', 40, currentY);
+
+  currentY += 15;
+
+  // SIGNATURE
+  doc.text('Ditetapkan di', 115, currentY);
+  doc.text(': Blora', 145, currentY);
+  currentY += 5;
+  doc.text('Pada Tanggal', 115, currentY);
+  doc.text(`: ${formatDateWithDay(data.tanggal).split(',')[1].trim()}`, 145, currentY);
+  doc.line(115, currentY + 1, 185, currentY + 1);
+
+  currentY += 10;
+  doc.setFont('helvetica', 'bold');
+  const kadisLines = [
+    'KEPALA DINAS SOSIAL PEMBERDAYAAN',
+    'PEREMPUAN DAN PERLINDUNGAN ANAK',
+    'KABUPATEN BLORA'
+  ];
+  kadisLines.forEach((line, i) => {
+    doc.text(line, 150, currentY + (i * 5), { align: 'center' });
+  });
+
+  currentY += 35;
+  doc.text(data.kadis.nama, 150, currentY, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.kadis.pangkat, 150, currentY + 5, { align: 'center' });
+  doc.text(`NIP : ${data.kadis.nip}`, 150, currentY + 10, { align: 'center' });
+
+  return doc;
+};
+
 export const generateSppdDepan = (data: SppdData) => {
   const doc = new jsPDF({
     orientation: 'p',
@@ -40,7 +211,7 @@ export const generateSppdDepan = (data: SppdData) => {
   }
 
   // KOP SURAT
-  doc.setFont('times', 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.text('PEMERINTAH KABUPATEN BLORA', 105, 15, { align: 'center' });
   doc.setFontSize(14);
@@ -48,7 +219,7 @@ export const generateSppdDepan = (data: SppdData) => {
   doc.text('DAN PERLINDUNGAN ANAK', 105, 27, { align: 'center' });
   
   doc.setFontSize(9);
-  doc.setFont('times', 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.text('Jl. Pemuda No.16 A Blora 58215, No. Tlp: (0296) 5298541', 105, 32, { align: 'center' });
   doc.text('Website : dinsos.blorakab.go.id / E-mail : dinsosp3a.bla@gmail.com', 105, 36, { align: 'center' });
 
@@ -64,7 +235,7 @@ export const generateSppdDepan = (data: SppdData) => {
   doc.text('Nomor       : ' + (data.nomorSppd || '...........................................'), 140, 53);
 
   // JUDUL
-  doc.setFont('times', 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.text('SURAT PERJALANAN DINAS (SPD)', 105, 63, { align: 'center' });
   const textWidth = doc.getTextWidth('SURAT PERJALANAN DINAS (SPD)');
@@ -94,7 +265,7 @@ export const generateSppdDepan = (data: SppdData) => {
       ['7.', { content: 'PENGIKUT :', colSpan: 2 }, ''],
     ],
     styles: {
-      font: 'times',
+      font: 'helvetica',
       fontSize: 9,
       cellPadding: 1.5,
       lineColor: [0, 0, 0],
@@ -131,7 +302,7 @@ export const generateSppdDepan = (data: SppdData) => {
       lineColor: [0, 0, 0]
     },
     styles: {
-      font: 'times',
+      font: 'helvetica',
       fontSize: 8,
       cellPadding: 1,
       lineColor: [0, 0, 0],
@@ -164,7 +335,7 @@ export const generateSppdDepan = (data: SppdData) => {
       ['9.', 'Keterangan lain-lain', ''],
     ],
     styles: {
-      font: 'times',
+      font: 'helvetica',
       fontSize: 9,
       cellPadding: 1.5,
       lineColor: [0, 0, 0],
@@ -181,25 +352,25 @@ export const generateSppdDepan = (data: SppdData) => {
   const finalY = (doc as any).lastAutoTable.finalY + 10;
 
   // SIGNATURES - Dikeluarkan
-  doc.setFont('times', 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text('Dikeluarkan di : Blora', 130, finalY);
   doc.text('Pada Tanggal  : ' + data.tanggal, 130, finalY + 5);
   doc.line(130, finalY + 6, 185, finalY + 6);
 
   // PPK & Pelaksana Labels
-  doc.setFont('times', 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text('PELAKSANA PERJALANAN DINAS', 30, finalY + 15);
   doc.text('PEJABAT PEMBUAT KOMITMEN', 130, finalY + 15);
 
   // Names
   doc.text(data.petugas.nama, 30, finalY + 40);
-  doc.setFont('times', 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.text('NIP : ' + (data.petugas.nip || '-'), 30, finalY + 45);
 
-  doc.setFont('times', 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text(data.ppk.nama, 130, finalY + 40);
-  doc.setFont('times', 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.text('NIP : ' + data.ppk.nip, 130, finalY + 45);
 
   return doc;

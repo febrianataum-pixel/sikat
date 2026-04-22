@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate, cn } from '../lib/utils';
-import { generateSppdDepan } from '../services/pdfService';
+import { generateSppdDepan, generateSpt } from '../services/pdfService';
 
 interface Petugas {
   id: string;
@@ -30,6 +30,7 @@ interface Petugas {
 
 interface Kegiatan {
   id: string;
+  nomor?: string;
   petugasId: string;
   petugasNama: string;
   subKegiatanId?: string;
@@ -128,6 +129,7 @@ export default function KegiatanPage() {
       const data = {
         petugasId: currentKegiatan.petugasId,
         petugasNama: pNama,
+        nomor: currentKegiatan.nomor || '',
         subKegiatanId: currentKegiatan.subKegiatanId || '',
         tanggal: currentKegiatan.tanggal,
         tempat: currentKegiatan.tempat,
@@ -166,6 +168,7 @@ export default function KegiatanPage() {
     let doc;
     if (label === 'sppd_depan') {
       doc = generateSppdDepan({
+        nomorSppd: k.nomor,
         petugas: {
           nama: k.petugasNama,
           nip: (p as any).nip || '-',
@@ -185,6 +188,28 @@ export default function KegiatanPage() {
         subKegiatan: subKegiatan.find(s => s.id === k.subKegiatanId)?.nama
       });
       doc.save(`SPPD_${k.petugasNama}_${k.tanggal}.pdf`);
+    } else if (label === 'spt') {
+      const kadisOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA DINAS')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Kepala Dinas' };
+      doc = generateSpt({
+        nomorSpt: k.nomor,
+        dasarHukum: settings?.dasarHukum || [],
+        petugas: {
+          nama: k.petugasNama,
+          nip: (p as any).nip,
+          pangkat: (p as any).pangkat,
+          jabatan: (p as any).jenis
+        },
+        maksud: k.uraian,
+        tempat: k.tempat,
+        tanggal: k.tanggal,
+        logoUrl: settings?.logoUrl,
+        kadis: {
+          nama: kadisOfficial.nama,
+          nip: kadisOfficial.nip,
+          pangkat: (kadisOfficial as any).pangkat || '-'
+        }
+      });
+      doc.save(`SPT_${k.petugasNama}_${k.tanggal}.pdf`);
     } else {
       alert(`Sedang menyiapkan dokumen: ${label}`);
     }
@@ -199,6 +224,7 @@ export default function KegiatanPage() {
     let doc;
     if (type === 'sppd') {
       doc = generateSppdDepan({
+        nomorSppd: k.nomor,
         petugas: {
           nama: k.petugasNama,
           nip: (p as any).nip || '-',
@@ -216,6 +242,27 @@ export default function KegiatanPage() {
         uraian: k.uraian,
         logoUrl: settings?.logoUrl,
         subKegiatan: subKegiatan.find(s => s.id === k.subKegiatanId)?.nama
+      });
+    } else if (type === 'spt') {
+      const kadisOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA DINAS')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Kepala Dinas' };
+      doc = generateSpt({
+        nomorSpt: k.nomor,
+        dasarHukum: settings?.dasarHukum || [],
+        petugas: {
+          nama: k.petugasNama,
+          nip: (p as any).nip,
+          pangkat: (p as any).pangkat,
+          jabatan: (p as any).jenis
+        },
+        maksud: k.uraian,
+        tempat: k.tempat,
+        tanggal: k.tanggal,
+        logoUrl: settings?.logoUrl,
+        kadis: {
+          nama: kadisOfficial.nama,
+          nip: kadisOfficial.nip,
+          pangkat: (kadisOfficial as any).pangkat || '-'
+        }
       });
     } else {
       // Temporary placeholder for other types using refined layout
@@ -447,6 +494,17 @@ export default function KegiatanPage() {
                       onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, tanggal: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nomor Surat / SPT</label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm"
+                    placeholder="Contoh: 000.1.2.3 / 123 / 2024"
+                    value={currentKegiatan?.nomor || ''}
+                    onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, nomor: e.target.value })}
+                  />
                 </div>
 
                 <div>

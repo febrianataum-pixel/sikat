@@ -38,13 +38,13 @@ export default function UtilitasPage() {
   const [subKegiatan, setSubKegiatan] = useState<{id?: string, kode: string, nama: string}[]>([]);
   const [biaya, setBiaya] = useState<{id?: string, tingkat: string, jenis: 'Dalam Daerah' | 'Luar Daerah', nominal: number}[]>([]);
   const [bbm, setBbm] = useState<{id?: string, jenis: string, harga: number}[]>([]);
-  const [manajemen, setManajemen] = useState<{id?: string, nama: string, nip: string, jabatan: string}[]>([]);
+  const [manajemen, setManajemen] = useState<{id?: string, nama: string, nip: string, pangkat: string, jabatan: string}[]>([]);
 
   // Temp form inputs
   const [newSub, setNewSub] = useState({ kode: '', nama: '' });
   const [newBiaya, setNewBiaya] = useState({ tingkat: 'A', jenis: 'Dalam Daerah' as const, nominal: 0 });
   const [newBbm, setNewBbm] = useState({ jenis: '', harga: 0 });
-  const [newManajemen, setNewManajemen] = useState({ nama: '', nip: '', jabatan: '' });
+  const [newManajemen, setNewManajemen] = useState({ nama: '', nip: '', pangkat: '', jabatan: '' });
 
   useEffect(() => {
     fetchData();
@@ -164,7 +164,7 @@ export default function UtilitasPage() {
   const handleAddManajemen = async () => {
     if (!newManajemen.nama || !newManajemen.jabatan) return;
     await addDoc(collection(db, 'manajemen'), newManajemen);
-    setNewManajemen({ nama: '', nip: '', jabatan: '' });
+    setNewManajemen({ nama: '', nip: '', pangkat: '', jabatan: '' });
     fetchData();
     showSuccess('Pejabat manajemen berhasil ditambahkan');
   };
@@ -610,6 +610,13 @@ export default function UtilitasPage() {
                       />
                       <input 
                         type="text" 
+                        placeholder="Pangkat / Golongan" 
+                        className="px-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={newManajemen.pangkat}
+                        onChange={e => setNewManajemen({...newManajemen, pangkat: e.target.value})}
+                      />
+                      <input 
+                        type="text" 
                         placeholder="Jabatan dalam Dokumen (PPK, dll)" 
                         className="px-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                         value={newManajemen.jabatan}
@@ -626,10 +633,11 @@ export default function UtilitasPage() {
 
                 <div className="overflow-hidden border border-slate-100 rounded-xl">
                   <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-100">
+                     <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
                         <th className="px-6 py-3 text-left text-[10px] font-bold uppercase text-slate-400">Nama Pejabat</th>
                         <th className="px-6 py-3 text-left text-[10px] font-bold uppercase text-slate-400">NIP</th>
+                        <th className="px-6 py-3 text-left text-[10px] font-bold uppercase text-slate-400">Pangkat</th>
                         <th className="px-6 py-3 text-left text-[10px] font-bold uppercase text-slate-400">Jabatan</th>
                         <th className="px-6 py-3 text-right text-[10px] font-bold uppercase text-slate-400">Aksi</th>
                       </tr>
@@ -639,6 +647,7 @@ export default function UtilitasPage() {
                         <tr key={item.id} className="hover:bg-slate-50/50">
                           <td className="px-6 py-4 text-sm font-bold text-slate-700">{item.nama}</td>
                           <td className="px-6 py-4 text-xs font-mono text-slate-500">{item.nip}</td>
+                          <td className="px-6 py-4 text-xs font-medium text-slate-500">{item.pangkat || '-'}</td>
                           <td className="px-6 py-4 text-sm font-semibold text-indigo-600">{item.jabatan}</td>
                           <td className="px-6 py-4 text-right">
                             <button onClick={() => confirmDelete('manajemen', item.id!)} className="text-slate-300 hover:text-rose-600 p-1 transition-colors">
