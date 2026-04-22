@@ -100,19 +100,20 @@ export const generateSpt = (data: {
   const currentYear = new Date().getFullYear();
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text(`Nomor : ${data.nomorSpt || '000.1.2.3'} /                / ${currentYear}`, 105, 56, { align: 'center' });
+  doc.text(`Nomor : 000.1.2.3 / ${data.nomorSpt || '                '} / ${currentYear}`, 105, 56, { align: 'center' });
 
   let currentY = 70;
 
   // DASAR
   doc.setFont('helvetica', 'normal');
-  doc.text('Dasar              :', 15, currentY);
+  doc.text('Dasar', 15, currentY);
+  doc.text(':', 35, currentY);
   
   const dasars = data.dasarHukum.length > 0 ? data.dasarHukum : ['Kepentingan Dinas.'];
   dasars.forEach((dasar, i) => {
-    const text = `${i + 1}. ${dasar}`;
-    const lines = doc.splitTextToSize(text, 145);
-    doc.text(lines, 40, currentY);
+    doc.text(`${i + 1}.`, 40, currentY);
+    const lines = doc.splitTextToSize(dasar, 140);
+    doc.text(lines, 45, currentY);
     currentY += (lines.length * 5) + 2;
   });
 
@@ -122,36 +123,38 @@ export const generateSpt = (data: {
 
   // KEPADA
   doc.setFont('helvetica', 'normal');
-  doc.text('Kepada          :', 15, currentY);
+  doc.text('Kepada', 15, currentY);
+  doc.text(':', 35, currentY);
   
   // Member 1 (Always at least one)
   doc.text('1.  Nama', 40, currentY);
-  doc.text(`: ${data.petugas.nama}`, 70, currentY);
+  doc.text(`: ${data.petugas.nama}`, 75, currentY);
   currentY += 5;
   doc.text('    Pangkat/Gol', 40, currentY);
-  doc.text(`: ${data.petugas.pangkat || '-'}`, 70, currentY);
+  doc.text(`: ${data.petugas.pangkat || '-'}`, 75, currentY);
   currentY += 5;
   doc.text('    NIP', 40, currentY);
-  doc.text(`: ${data.petugas.nip || '-'}`, 70, currentY);
+  doc.text(`: ${data.petugas.nip || '-'}`, 75, currentY);
   currentY += 5;
   doc.text('    Jabatan', 40, currentY);
-  doc.text(`: ${data.petugas.jabatan || '-'}`, 70, currentY);
+  doc.text(`: ${data.petugas.jabatan || '-'}`, 75, currentY);
   
   currentY += 10;
 
   // UNTUK
-  doc.text('Untuk            :', 15, currentY);
+  doc.text('Untuk', 15, currentY);
+  doc.text(':', 35, currentY);
   doc.text('1.  Maksud Perjalanan', 40, currentY);
-  const maksudLines = doc.splitTextToSize(`: ${data.maksud}`, 120);
-  doc.text(maksudLines, 70, currentY);
+  const maksudLines = doc.splitTextToSize(`: ${data.maksud}`, 110);
+  doc.text(maksudLines, 80, currentY);
   currentY += (maksudLines.length * 5) + 2;
 
   doc.text('    Tempat', 40, currentY);
-  doc.text(`: ${data.tempat}`, 70, currentY);
+  doc.text(`: ${data.tempat}`, 80, currentY);
   currentY += 5;
 
   doc.text('    Hari/Tanggal', 40, currentY);
-  doc.text(`: ${formatDateWithDay(data.tanggal)}`, 70, currentY);
+  doc.text(`: ${formatDateWithDay(data.tanggal)}`, 80, currentY);
   currentY += 10;
 
   doc.text('2.  Melaporkan hasil pelaksanaan tugas kepada pemberi tugas;', 40, currentY);

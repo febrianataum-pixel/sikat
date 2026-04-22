@@ -31,6 +31,8 @@ interface Petugas {
 interface Kegiatan {
   id: string;
   nomor?: string;
+  nomorUrut?: string;
+  tahun?: string;
   petugasId: string;
   petugasNama: string;
   subKegiatanId?: string;
@@ -125,10 +127,16 @@ export default function KegiatanPage() {
       
       const isComplete = !!(currentKegiatan.hasLaporan && currentKegiatan.hasDokumentasi && currentKegiatan.hasSppd);
 
+      const fullNomor = currentKegiatan.nomorUrut 
+        ? `000.1.2.3 / ${currentKegiatan.nomorUrut} / ${currentKegiatan.tahun || new Date().getFullYear()}`
+        : (currentKegiatan.nomor || '');
+
       const data = {
         petugasId: currentKegiatan.petugasId,
         petugasNama: pNama,
-        nomor: currentKegiatan.nomor || '',
+        nomor: fullNomor,
+        nomorUrut: currentKegiatan.nomorUrut || '',
+        tahun: currentKegiatan.tahun || new Date().getFullYear().toString(),
         subKegiatanId: currentKegiatan.subKegiatanId || '',
         tanggal: currentKegiatan.tanggal,
         tempat: currentKegiatan.tempat,
@@ -310,7 +318,11 @@ export default function KegiatanPage() {
         <h2 className="text-xl font-bold tracking-tight text-slate-800">Log Kegiatan Harian</h2>
         <button
           onClick={() => {
-            setCurrentKegiatan({ tanggal: new Date().toISOString().split('T')[0], laporanSelesai: false });
+            setCurrentKegiatan({ 
+              tanggal: new Date().toISOString().split('T')[0], 
+              laporanSelesai: false,
+              tahun: new Date().getFullYear().toString()
+            });
             setIsModalOpen(true);
           }}
           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors"
@@ -497,13 +509,27 @@ export default function KegiatanPage() {
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nomor Surat / SPT</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm"
-                    placeholder="Contoh: 000.1.2.3 / 123 / 2024"
-                    value={currentKegiatan?.nomor || ''}
-                    onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, nomor: e.target.value })}
-                  />
+                  <div className="flex items-center bg-slate-50 border border-slate-200 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:bg-white transition-all">
+                    <span className="px-3 py-2 text-slate-400 font-bold text-sm bg-slate-100 border-r border-slate-200">000.1.2.3 /</span>
+                    <input
+                      type="text"
+                      className="flex-1 px-4 py-2 bg-transparent outline-none text-sm font-bold text-slate-800"
+                      placeholder="Input Nomor"
+                      value={currentKegiatan?.nomorUrut || ''}
+                      onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, nomorUrut: e.target.value })}
+                    />
+                    <span className="px-2 py-2 text-slate-400 font-bold text-sm">/</span>
+                    <select
+                      className="px-3 py-2 bg-transparent outline-none text-sm font-bold text-slate-800 border-l border-slate-200 cursor-pointer"
+                      value={currentKegiatan?.tahun || new Date().getFullYear()}
+                      onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, tahun: e.target.value })}
+                    >
+                      {[0, 1, 2, 3].map(offset => {
+                        const year = new Date().getFullYear() + offset;
+                        return <option key={year} value={year}>{year}</option>
+                      })}
+                    </select>
+                  </div>
                 </div>
 
                 <div>
