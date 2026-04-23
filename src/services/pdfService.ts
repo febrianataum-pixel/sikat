@@ -271,11 +271,11 @@ export const generateRincianBiaya = (data: {
 
   const tableData = data.rincian.map((item, i) => [
     i + 1,
-    item.uraian,
+    data.petugas.nama,
     `Rp ${item.nominal.toLocaleString('id-ID')}`,
     item.hari,
     `Rp ${(item.nominal * item.hari).toLocaleString('id-ID')}`,
-    `Tingkat ${data.petugas.tingkatSPPD}`,
+    data.petugas.tingkatSPPD,
     `${i + 1}.`
   ]);
 
@@ -291,18 +291,20 @@ export const generateRincianBiaya = (data: {
     styles: { fontSize: 10, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
     columnStyles: {
       0: { halign: 'center', cellWidth: 10 },
+      1: { cellWidth: 50 },
       2: { halign: 'right' },
       3: { halign: 'center', cellWidth: 15 },
-      4: { halign: 'right' },
-      5: { halign: 'center' },
-      6: { cellWidth: 15 }
+      4: { halign: 'right', cellWidth: 35 },
+      5: { halign: 'center', cellWidth: 25 },
+      6: { halign: 'center', cellWidth: 15 }
     }
   });
 
-  let currentY = (doc as any).lastAutoTable.finalY + 2;
+  let currentY = (doc as any).lastAutoTable.finalY + 5;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(10);
-  doc.text(`( ${terbilangText} )`, 15, currentY);
+  doc.text('Terbilang :', 15, currentY);
+  doc.text(`( ${terbilangText} )`, 35, currentY);
 
   currentY += 15;
   doc.setFont('helvetica', 'normal');
