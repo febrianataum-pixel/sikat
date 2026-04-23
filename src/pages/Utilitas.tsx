@@ -116,29 +116,20 @@ export default function UtilitasPage() {
     setLoading(true);
     try {
       const storageRef = ref(storage, `logo/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file).catch(storErr => {
-        console.error("Storage upload error details:", storErr);
-        // Providing more descriptive error for the user to troubleshoot
-        const msg = storErr?.code === 'storage/unauthorized' 
-          ? "Izin ditolak (Unauthorized). Pastikan 'Storage Rules' di Firebase Console sudah diatur ke 'read/write'." 
-          : `Gagal mengunggah (${storErr?.code || 'Error'}). Pastikan Firebase Storage sudah aktif di Console.`;
-        throw new Error(msg);
-      });
+      const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
       
-      setSettings(prev => {
-        const next = { ...prev, logoUrl: url };
-        // Auto-save to firestore with newest state
-        setDoc(doc(db, 'settings', 'general'), next);
-        return next;
-      });
+      const nextSettings = { ...settings, logoUrl: url };
+      await setDoc(doc(db, 'settings', 'general'), nextSettings);
+      setSettings(nextSettings);
 
       showSuccess('Logo KOP berhasil diunggah dan disimpan');
     } catch (err) {
-      console.error("General upload error:", err);
-      alert(err instanceof Error ? err.message : 'Gagal mengunggah logo.');
+      console.error("Upload error:", err);
+      alert('Gagal mengunggah logo. Pastikan file valid.');
     } finally {
       setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -303,11 +294,12 @@ export default function UtilitasPage() {
                           key={settings.logoUrl}
                           src={settings.logoUrl} 
                           className="w-full h-full object-contain p-2" 
-                          referrerPolicy="no-referrer"
                           onError={() => {
-                            console.error("Image load error for logoUrl");
-                            // Fallback to placeholder if image fails to load
-                            setSettings(prev => ({ ...prev, logoUrl: "https://placehold.co/100x100?text=Error+Loading" }));
+                            console.error("Image load error for logoUrl:", settings.logoUrl);
+                            // Only set fallback if it's NOT already the default logo
+                            if (settings.logoUrl !== DEFAULT_LOGO) {
+                              setSettings(prev => ({ ...prev, logoUrl: DEFAULT_LOGO }));
+                            }
                           }}
                         />
                       ) : (

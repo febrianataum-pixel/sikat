@@ -1,1 +1,1 @@
-export const DEFAULT_LOGO = "https://firebasestorage.googleapis.com/v0/b/ais-gallery.appspot.com/o/logos%2Fblora_logo.png?alt=media";
+export const DEFAULT_LOGO = "https://placehold.co/200x200/FFFFFF/3b82f6.png?text=LOGO+BLORA";
