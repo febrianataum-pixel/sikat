@@ -267,29 +267,33 @@ export const generateRincianBiaya = (data: {
   const tableData = data.rincian.map((item, i) => [
     i + 1,
     data.petugas.nama,
-    `Rp ${item.nominal.toLocaleString('id-ID')}`,
+    item.nominal.toLocaleString('id-ID'),
     item.hari,
-    `Rp ${(item.nominal * item.hari).toLocaleString('id-ID')}`,
+    (item.nominal * item.hari).toLocaleString('id-ID'),
     data.petugas.tingkatSPPD,
     `${i + 1}.`
   ]);
 
   autoTable(doc, {
     startY: 50,
-    head: [['NO', 'PERINCIAN BIAYA', 'NOMINAL', 'HARI', 'JUMLAH DITERIMA', 'KET', 'TTD']],
+    head: [['NO', 'PERINCIAN BIAYA', 'NOMINAL (Rp)', 'HARI', 'JUMLAH (Rp)', 'KET', 'TTD']],
     body: [
       ...tableData,
-      [{ content: 'JUMLAH', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } }, { content: `Rp ${total.toLocaleString('id-ID')}`, styles: { fontStyle: 'bold' } }, '', '']
+      [
+        { content: 'JUMLAH TOTAL', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } }, 
+        { content: total.toLocaleString('id-ID'), styles: { fontStyle: 'bold', halign: 'right' } }, 
+        { content: '', colSpan: 2 }
+      ]
     ],
     theme: 'grid',
     headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], halign: 'center' },
-    styles: { fontSize: 10, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+    styles: { fontSize: 9, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
     columnStyles: {
       0: { halign: 'center', cellWidth: 10 },
-      1: { cellWidth: 50 },
-      2: { halign: 'right' },
+      1: { cellWidth: 55 },
+      2: { halign: 'right', cellWidth: 25 },
       3: { halign: 'center', cellWidth: 15 },
-      4: { halign: 'right', cellWidth: 35 },
+      4: { halign: 'right', cellWidth: 30 },
       5: { halign: 'center', cellWidth: 25 },
       6: { halign: 'center', cellWidth: 15 }
     }

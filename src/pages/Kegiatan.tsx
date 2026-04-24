@@ -39,6 +39,7 @@ interface Kegiatan {
   tanggal: string;
   tempat: string;
   uraian: string;
+  lamaPerjalanan: number;
   hasLaporan: boolean;
   hasDokumentasi: boolean;
   hasSppd: boolean;
@@ -151,6 +152,7 @@ export default function KegiatanPage() {
         tanggal: currentKegiatan.tanggal,
         tempat: currentKegiatan.tempat,
         uraian: currentKegiatan.uraian || '',
+        lamaPerjalanan: currentKegiatan.lamaPerjalanan || 1,
         hasLaporan: !!currentKegiatan.hasLaporan,
         hasDokumentasi: !!currentKegiatan.hasDokumentasi,
         hasSppd: !!currentKegiatan.hasSppd,
@@ -191,7 +193,7 @@ export default function KegiatanPage() {
     )?.nominal || 0;
 
     const items = [
-      { uraian: 'Uang Harian', nominal: dailyAllowance, hari: 1 },
+      { uraian: `Uang Harian (${k.lamaPerjalanan || 1} Hari)`, nominal: dailyAllowance, hari: k.lamaPerjalanan || 1 },
       { uraian: 'Uang Transport / BBM', nominal: k.biayaTransport || 0, hari: 1 }
     ];
 
@@ -223,6 +225,7 @@ export default function KegiatanPage() {
         tanggal: formatDate(k.tanggal),
         tempat: k.tempat,
         uraian: k.uraian,
+        lamaPerjalanan: `${k.lamaPerjalanan || 1} Hari`,
         logoUrl: settings?.logoUrl,
         subKegiatan: subKegiatan.find(s => s.id === k.subKegiatanId)?.nama
       });
@@ -301,6 +304,7 @@ export default function KegiatanPage() {
         tanggal: formatDate(k.tanggal),
         tempat: k.tempat,
         uraian: k.uraian,
+        lamaPerjalanan: `${k.lamaPerjalanan || 1} Hari`,
         logoUrl: settings?.logoUrl,
         subKegiatan: subKegiatan.find(s => s.id === k.subKegiatanId)?.nama
       });
@@ -559,6 +563,17 @@ export default function KegiatanPage() {
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                       value={currentKegiatan?.tanggal || ''}
                       onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, tanggal: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Lama (Hari) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-bold"
+                      value={currentKegiatan?.lamaPerjalanan || 1}
+                      onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, lamaPerjalanan: Number(e.target.value) })}
                     />
                   </div>
                 </div>
