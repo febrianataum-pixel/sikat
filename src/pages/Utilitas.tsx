@@ -42,6 +42,11 @@ export default function UtilitasPage() {
   const [bbm, setBbm] = useState<{id?: string, jenis: string, harga: number}[]>([]);
   const [manajemen, setManajemen] = useState<{id?: string, nama: string, nip: string, pangkat: string, jabatan: string}[]>([]);
 
+  // Editing States
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingDasarHukumIndex, setEditingDasarHukumIndex] = useState<number | null>(null);
+
   // Temp form inputs
   const [newSub, setNewSub] = useState({ kode: '', nama: '' });
   const [newBiaya, setNewBiaya] = useState({ tingkat: 'A', jenis: 'Dalam Daerah' as const, nominal: 0 });
@@ -136,34 +141,110 @@ export default function UtilitasPage() {
 
   const handleAddSub = async () => {
     if (!newSub.kode || !newSub.nama) return;
-    await addDoc(collection(db, 'sub_kegiatan'), newSub);
-    setNewSub({ kode: '', nama: '' });
-    fetchData();
-    showSuccess('Sub kegiatan berhasil ditambahkan');
+    setLoading(true);
+    try {
+      if (editingId) {
+        await setDoc(doc(db, 'sub_kegiatan', editingId), newSub);
+      } else {
+        await addDoc(collection(db, 'sub_kegiatan'), newSub);
+      }
+      setNewSub({ kode: '', nama: '' });
+      setEditingId(null);
+      setIsEditing(false);
+      fetchData();
+      showSuccess(editingId ? 'Sub kegiatan berhasil diperbarui' : 'Sub kegiatan berhasil ditambahkan');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddBiaya = async () => {
     if (newBiaya.nominal <= 0) return;
-    await addDoc(collection(db, 'biaya_perjalanan'), newBiaya);
-    setNewBiaya({ tingkat: 'A', jenis: 'Dalam Daerah', nominal: 0 });
-    fetchData();
-    showSuccess('Data biaya berhasil ditambahkan');
+    setLoading(true);
+    try {
+      if (editingId) {
+        await setDoc(doc(db, 'biaya_perjalanan', editingId), newBiaya);
+      } else {
+        await addDoc(collection(db, 'biaya_perjalanan'), newBiaya);
+      }
+      setNewBiaya({ tingkat: 'A', jenis: 'Dalam Daerah', nominal: 0 });
+      setEditingId(null);
+      setIsEditing(false);
+      fetchData();
+      showSuccess(editingId ? 'Data biaya berhasil diperbarui' : 'Data biaya berhasil ditambahkan');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddBbm = async () => {
     if (!newBbm.jenis || newBbm.harga <= 0) return;
-    await addDoc(collection(db, 'bahan_bakar'), newBbm);
-    setNewBbm({ jenis: '', harga: 0 });
-    fetchData();
-    showSuccess('Data BBM berhasil ditambahkan');
+    setLoading(true);
+    try {
+      if (editingId) {
+        await setDoc(doc(db, 'bahan_bakar', editingId), newBbm);
+      } else {
+        await addDoc(collection(db, 'bahan_bakar'), newBbm);
+      }
+      setNewBbm({ jenis: '', harga: 0 });
+      setEditingId(null);
+      setIsEditing(false);
+      fetchData();
+      showSuccess(editingId ? 'Data BBM berhasil diperbarui' : 'Data BBM berhasil ditambahkan');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddManajemen = async () => {
     if (!newManajemen.nama || !newManajemen.jabatan) return;
-    await addDoc(collection(db, 'manajemen'), newManajemen);
+    setLoading(true);
+    try {
+      if (editingId) {
+        await setDoc(doc(db, 'manajemen', editingId), newManajemen);
+      } else {
+        await addDoc(collection(db, 'manajemen'), newManajemen);
+      }
+      setNewManajemen({ nama: '', nip: '', pangkat: '', jabatan: '' });
+      setEditingId(null);
+      setIsEditing(false);
+      fetchData();
+      showSuccess(editingId ? 'Pejabat manajemen berhasil diperbarui' : 'Pejabat manajemen berhasil ditambahkan');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEdit = (tab: UtilityTab, item: any) => {
+    setEditingId(item.id);
+    setIsEditing(true);
+    if (tab === 'sub_kegiatan') {
+      setNewSub({ kode: item.kode, nama: item.nama });
+    } else if (tab === 'biaya') {
+      setNewBiaya({ tingkat: item.tingkat, jenis: item.jenis, nominal: item.nominal });
+    } else if (tab === 'bbm') {
+      setNewBbm({ jenis: item.jenis, harga: item.harga });
+    } else if (tab === 'bendahara') {
+      setNewManajemen({ nama: item.nama, nip: item.nip, pangkat: item.pangkat, jabatan: item.jabatan });
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setIsEditing(false);
+    setNewSub({ kode: '', nama: '' });
+    setNewBiaya({ tingkat: 'A', jenis: 'Dalam Daerah', nominal: 0 });
+    setNewBbm({ jenis: '', harga: 0 });
     setNewManajemen({ nama: '', nip: '', pangkat: '', jabatan: '' });
-    fetchData();
-    showSuccess('Pejabat manajemen berhasil ditambahkan');
   };
 
   const confirmDelete = (coll: string, id: string) => {
@@ -188,19 +269,38 @@ export default function UtilitasPage() {
     if (!newDasarHukum.trim()) return;
     setLoading(true);
     try {
-      const newList = [...settings.dasarHukum, newDasarHukum.trim()];
+      let newList = [...settings.dasarHukum];
+      if (editingDasarHukumIndex !== null) {
+        newList[editingDasarHukumIndex] = newDasarHukum.trim();
+      } else {
+        newList.push(newDasarHukum.trim());
+      }
+      
       const newSettings = { ...settings, dasarHukum: newList };
       setSettings(newSettings);
       await setDoc(doc(db, 'settings', 'general'), newSettings);
       setNewDasarHukum('');
       setIsAddingDasarHukum(false);
-      showSuccess('Dasar hukum ditambahkan');
+      setEditingDasarHukumIndex(null);
+      showSuccess(editingDasarHukumIndex !== null ? 'Dasar hukum diperbarui' : 'Dasar hukum ditambahkan');
     } catch (err) {
       console.error(err);
       alert('Gagal menyimpan dasar hukum');
     } finally {
       setLoading(false);
     }
+  };
+
+  const startEditDasarHukum = (index: number) => {
+    setNewDasarHukum(settings.dasarHukum[index]);
+    setEditingDasarHukumIndex(index);
+    setIsAddingDasarHukum(true);
+  };
+
+  const cancelEditDasarHukum = () => {
+    setNewDasarHukum('');
+    setEditingDasarHukumIndex(null);
+    setIsAddingDasarHukum(false);
   };
 
   const handleDeleteDasarHukum = async (index: number) => {
@@ -336,75 +436,99 @@ export default function UtilitasPage() {
                 </div>
 
                 {/* Dasar Hukum Section */}
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                        <FileText size={20} />
-                      </div>
-                      Dasar Hukum (Surat Tugas)
-                    </h3>
-                    <button 
-                      onClick={() => setIsAddingDasarHukum(!isAddingDasarHukum)}
-                      className={cn(
-                        "p-2 rounded-lg transition-all",
-                        isAddingDasarHukum ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                      )}
-                    >
-                      {isAddingDasarHukum ? <X size={20} /> : <Plus size={20} />}
-                    </button>
-                  </div>
-
-                  <AnimatePresence>
-                    {isAddingDasarHukum && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
+                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                          <FileText size={20} />
+                        </div>
+                        Dasar Hukum (Surat Tugas)
+                      </h3>
+                      <button 
+                        onClick={() => {
+                          if (isAddingDasarHukum) cancelEditDasarHukum();
+                          else setIsAddingDasarHukum(true);
+                        }}
+                        className={cn(
+                          "p-2 rounded-lg transition-all",
+                          isAddingDasarHukum ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                        )}
                       >
-                        <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 space-y-4">
-                          <textarea
-                            className="w-full px-4 py-3 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all h-24 resize-none text-sm text-slate-600 leading-relaxed font-serif"
-                            placeholder="Masukkan dasar hukum baru... (Contoh: Keputusan Kepala Dinas Sosial Nomor...)"
-                            value={newDasarHukum}
-                            onChange={(e) => setNewDasarHukum(e.target.value)}
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => setIsAddingDasarHukum(false)}
-                              className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
+                        {isAddingDasarHukum ? <X size={20} /> : <Plus size={20} />}
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {isAddingDasarHukum && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className={cn(
+                            "p-6 rounded-2xl border space-y-4",
+                            editingDasarHukumIndex !== null ? "bg-amber-50 border-amber-100" : "bg-indigo-50/50 border-indigo-100"
+                          )}>
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-tight">
+                                {editingDasarHukumIndex !== null ? 'Edit Dasar Hukum' : 'Tambah Dasar Hukum Baru'}
+                              </h4>
+                            </div>
+                            <textarea
+                              className="w-full px-4 py-3 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all h-24 resize-none text-sm text-slate-600 leading-relaxed font-serif"
+                              placeholder="Masukkan dasar hukum baru... (Contoh: Keputusan Kepala Dinas Sosial Nomor...)"
+                              value={newDasarHukum}
+                              onChange={(e) => setNewDasarHukum(e.target.value)}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={cancelEditDasarHukum}
+                                className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
+                              >
+                                Batal
+                              </button>
+                              <button
+                                onClick={handleAddDasarHukum}
+                                disabled={loading || !newDasarHukum.trim()}
+                                className={cn(
+                                  "px-6 py-2 text-white text-xs font-bold rounded-lg disabled:opacity-50 transition-all flex items-center gap-2",
+                                  editingDasarHukumIndex !== null ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                                )}
+                              >
+                                {editingDasarHukumIndex !== null ? <Save size={14} /> : <CheckCircle size={14} />}
+                                {editingDasarHukumIndex !== null ? 'Simpan Perubahan' : 'Simpan Dasar Hukum'}
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
+                    <div className="space-y-3">
+                      {settings.dasarHukum.map((item, idx) => (
+                        <div key={idx} className="flex gap-2 group">
+                          <div className="flex-1 px-5 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm text-slate-600 font-serif leading-relaxed italic shadow-sm group-hover:bg-white group-hover:border-indigo-100 transition-all">
+                            {item}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <button 
+                              onClick={() => startEditDasarHukum(idx)}
+                              className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                              title="Edit"
                             >
-                              Batal
+                              <Settings size={18} />
                             </button>
-                            <button
-                              onClick={handleAddDasarHukum}
-                              disabled={loading || !newDasarHukum.trim()}
-                              className="px-6 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-2"
+                            <button 
+                              onClick={() => handleDeleteDasarHukum(idx)}
+                              className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                              title="Hapus"
                             >
-                              <CheckCircle size={14} />
-                              Simpan Dasar Hukum
+                              <Trash2 size={18} />
                             </button>
                           </div>
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  
-                  <div className="space-y-3">
-                    {settings.dasarHukum.map((item, idx) => (
-                      <div key={idx} className="flex gap-2 group">
-                        <div className="flex-1 px-5 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm text-slate-600 font-serif leading-relaxed italic shadow-sm group-hover:bg-white group-hover:border-indigo-100 transition-all">
-                          {item}
-                        </div>
-                        <button 
-                          onClick={() => handleDeleteDasarHukum(idx)}
-                          className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    ))}
+                      ))}
                     {settings.dasarHukum.length === 0 && (
                       <div className="px-6 py-12 border-2 border-dashed border-slate-100 rounded-2xl text-center text-slate-400 italic text-sm">
                         Belum ada dasar hukum yang ditambahkan.
@@ -417,8 +541,20 @@ export default function UtilitasPage() {
 
             {activeTab === 'sub_kegiatan' && (
               <div className="p-8 space-y-8">
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
-                   <h3 className="text-sm font-bold text-slate-800">Tambah Sub Kegiatan Baru</h3>
+                <div className={cn(
+                  "rounded-2xl p-6 border transition-all space-y-4",
+                  isEditing ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"
+                )}>
+                   <div className="flex items-center justify-between">
+                     <h3 className="text-sm font-bold text-slate-800">
+                       {isEditing ? 'Edit Sub Kegiatan' : 'Tambah Sub Kegiatan Baru'}
+                     </h3>
+                     {isEditing && (
+                       <button onClick={cancelEdit} className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline">
+                         <X size={14} /> Batal
+                       </button>
+                     )}
+                   </div>
                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <input 
                         type="text" 
@@ -436,9 +572,14 @@ export default function UtilitasPage() {
                       />
                       <button 
                         onClick={handleAddSub}
-                        className="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
+                        disabled={loading}
+                        className={cn(
+                          "rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 transition-colors text-white",
+                          isEditing ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                        )}
                       >
-                        <Plus size={16} /> Tambah
+                        {isEditing ? <Save size={16} /> : <Plus size={16} />} 
+                        {isEditing ? 'Simpan Perubahan' : 'Tambah'}
                       </button>
                    </div>
                 </div>
@@ -457,7 +598,13 @@ export default function UtilitasPage() {
                         <tr key={item.id} className="hover:bg-slate-50/50">
                           <td className="px-6 py-4 text-sm font-mono text-indigo-600">{item.kode}</td>
                           <td className="px-6 py-4 text-sm text-slate-700 font-medium">{item.nama}</td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                            <button 
+                              onClick={() => startEdit('sub_kegiatan', item)} 
+                              className="text-slate-300 hover:text-indigo-600 p-1 transition-colors"
+                            >
+                              <Settings size={16} />
+                            </button>
                             <button onClick={() => confirmDelete('sub_kegiatan', item.id!)} className="text-slate-300 hover:text-rose-600 p-1 transition-colors">
                               <Trash2 size={16} />
                             </button>
@@ -472,8 +619,20 @@ export default function UtilitasPage() {
 
             {activeTab === 'biaya' && (
               <div className="p-8 space-y-8">
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
-                   <h3 className="text-sm font-bold text-slate-800">Tambah Standar Biaya Baru</h3>
+                <div className={cn(
+                  "rounded-2xl p-6 border transition-all space-y-4",
+                  isEditing ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"
+                )}>
+                   <div className="flex items-center justify-between">
+                     <h3 className="text-sm font-bold text-slate-800">
+                       {isEditing ? 'Edit Standar Biaya' : 'Tambah Standar Biaya Baru'}
+                     </h3>
+                     {isEditing && (
+                       <button onClick={cancelEdit} className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline">
+                         <X size={14} /> Batal
+                       </button>
+                     )}
+                   </div>
                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                       <select 
                         className="px-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
@@ -499,9 +658,14 @@ export default function UtilitasPage() {
                       />
                       <button 
                         onClick={handleAddBiaya}
-                        className="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
+                        disabled={loading}
+                        className={cn(
+                          "rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 transition-colors text-white",
+                          isEditing ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                        )}
                       >
-                        <Plus size={16} /> Tambah
+                        {isEditing ? <Save size={16} /> : <Plus size={16} />} 
+                        {isEditing ? 'Simpan' : 'Tambah'}
                       </button>
                    </div>
                 </div>
@@ -526,7 +690,13 @@ export default function UtilitasPage() {
                              </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-slate-700 font-mono">Rp {item.nominal.toLocaleString('id-ID')}</td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                             <button 
+                              onClick={() => startEdit('biaya', item)} 
+                              className="text-slate-300 hover:text-indigo-600 p-1 transition-colors"
+                            >
+                              <Settings size={16} />
+                            </button>
                             <button onClick={() => confirmDelete('biaya_perjalanan', item.id!)} className="text-slate-300 hover:text-rose-600 p-1 transition-colors">
                               <Trash2 size={16} />
                             </button>
@@ -541,8 +711,20 @@ export default function UtilitasPage() {
 
             {activeTab === 'bbm' && (
               <div className="p-8 space-y-8">
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
-                   <h3 className="text-sm font-bold text-slate-800">Tambah Standar BBM Baru</h3>
+                <div className={cn(
+                  "rounded-2xl p-6 border transition-all space-y-4",
+                  isEditing ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"
+                )}>
+                   <div className="flex items-center justify-between">
+                     <h3 className="text-sm font-bold text-slate-800">
+                       {isEditing ? 'Edit Standar BBM' : 'Tambah Standar BBM Baru'}
+                     </h3>
+                     {isEditing && (
+                       <button onClick={cancelEdit} className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline">
+                         <X size={14} /> Batal
+                       </button>
+                     )}
+                   </div>
                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <input 
                         type="text" 
@@ -560,9 +742,14 @@ export default function UtilitasPage() {
                       />
                       <button 
                         onClick={handleAddBbm}
-                        className="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
+                        disabled={loading}
+                        className={cn(
+                          "rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 transition-colors text-white",
+                          isEditing ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                        )}
                       >
-                        <Plus size={16} /> Tambah
+                        {isEditing ? <Save size={16} /> : <Plus size={16} />} 
+                        {isEditing ? 'Simpan' : 'Tambah'}
                       </button>
                    </div>
                 </div>
@@ -581,7 +768,13 @@ export default function UtilitasPage() {
                         <tr key={item.id} className="hover:bg-slate-50/50">
                           <td className="px-6 py-4 text-sm font-bold text-slate-700">{item.jenis}</td>
                           <td className="px-6 py-4 text-sm text-slate-700 font-mono">Rp {item.harga.toLocaleString('id-ID')}</td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                             <button 
+                              onClick={() => startEdit('bbm', item)} 
+                              className="text-slate-300 hover:text-indigo-600 p-1 transition-colors"
+                            >
+                              <Settings size={16} />
+                            </button>
                             <button onClick={() => confirmDelete('bahan_bakar', item.id!)} className="text-slate-300 hover:text-rose-600 p-1 transition-colors">
                               <Trash2 size={16} />
                             </button>
@@ -596,8 +789,20 @@ export default function UtilitasPage() {
 
             {activeTab === 'bendahara' && (
               <div className="p-8 space-y-8">
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
-                   <h3 className="text-sm font-bold text-slate-800">Tambah Pejabat Penandatangan (Bendahara, dll)</h3>
+                <div className={cn(
+                  "rounded-2xl p-6 border transition-all space-y-4",
+                  isEditing ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"
+                )}>
+                   <div className="flex items-center justify-between">
+                     <h3 className="text-sm font-bold text-slate-800">
+                       {isEditing ? 'Edit Pejabat Penandatangan' : 'Tambah Pejabat Penandatangan'}
+                     </h3>
+                     {isEditing && (
+                       <button onClick={cancelEdit} className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline">
+                         <X size={14} /> Batal
+                       </button>
+                     )}
+                   </div>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <input 
                         type="text" 
@@ -629,9 +834,14 @@ export default function UtilitasPage() {
                       />
                       <button 
                         onClick={handleAddManajemen}
-                        className="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
+                        disabled={loading}
+                        className={cn(
+                          "rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 transition-colors text-white sm:col-span-2",
+                          isEditing ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                        )}
                       >
-                        <Plus size={16} /> Tambah Pejabat
+                        {isEditing ? <Save size={16} /> : <Plus size={16} />} 
+                        {isEditing ? 'Simpan Perubahan' : 'Tambah Pejabat'}
                       </button>
                    </div>
                 </div>
@@ -654,7 +864,13 @@ export default function UtilitasPage() {
                           <td className="px-6 py-4 text-xs font-mono text-slate-500">{item.nip}</td>
                           <td className="px-6 py-4 text-xs font-medium text-slate-500">{item.pangkat || '-'}</td>
                           <td className="px-6 py-4 text-sm font-semibold text-indigo-600">{item.jabatan}</td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                             <button 
+                              onClick={() => startEdit('bendahara', item)} 
+                              className="text-slate-300 hover:text-indigo-600 p-1 transition-colors"
+                            >
+                              <Settings size={16} />
+                            </button>
                             <button onClick={() => confirmDelete('manajemen', item.id!)} className="text-slate-300 hover:text-rose-600 p-1 transition-colors">
                               <Trash2 size={16} />
                             </button>
