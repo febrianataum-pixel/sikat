@@ -194,9 +194,8 @@ export const generateSpt = (data: {
   return doc;
 };
 
-export const terbilang = (n: number): string => {
-  if (n < 0) return "Minus " + terbilang(-n);
-  if (n === 0) return "Nol Rupiah";
+const sayNumber = (n: number): string => {
+  if (n === 0) return "";
   
   const units = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
   let res = "";
@@ -204,12 +203,21 @@ export const terbilang = (n: number): string => {
   if (n < 12) res = units[n];
   else if (n < 20) res = units[n - 10] + " Belas";
   else if (n < 100) res = units[Math.floor(n / 10)] + " Puluh " + units[n % 10];
-  else if (n < 200) res = "Seratus " + terbilang(n - 100);
-  else if (n < 1000) res = units[Math.floor(n / 100)] + " Ratus " + terbilang(n % 100);
-  else if (n < 2000) res = "Seribu " + terbilang(n - 1000);
-  else if (n < 1000000) res = terbilang(Math.floor(n / 1000)) + " Ribu " + terbilang(n % 1000);
-  else if (n < 1000000000) res = terbilang(Math.floor(n / 1000000)) + " Juta " + terbilang(n % 1000000);
-  else res = terbilang(Math.floor(n / 1000000000)) + " Miliar " + terbilang(n % 1000000000);
+  else if (n < 200) res = "Seratus " + sayNumber(n - 100);
+  else if (n < 1000) res = units[Math.floor(n / 100)] + " Ratus " + sayNumber(n % 100);
+  else if (n < 2000) res = "Seribu " + sayNumber(n - 1000);
+  else if (n < 1000000) res = sayNumber(Math.floor(n / 1000)) + " Ribu " + sayNumber(n % 1000);
+  else if (n < 1000000000) res = sayNumber(Math.floor(n / 1000000)) + " Juta " + sayNumber(n % 1000000);
+  else res = sayNumber(Math.floor(n / 1000000000)) + " Miliar " + sayNumber(n % 1000000000);
+  
+  return res.trim();
+};
+
+export const terbilang = (n: number): string => {
+  if (n === 0) return "Nol Rupiah";
+  if (n < 0) return "Minus " + terbilang(-n);
+  
+  let res = sayNumber(n);
   
   // Specific Indonesian language fixes
   res = res.replace("Satu Puluh", "Sepuluh")
@@ -217,13 +225,8 @@ export const terbilang = (n: number): string => {
            .replace("Satu Ribu", "Seribu")
            .replace(/\s+/g, " ")
            .trim();
-
-  // If the result doesn't contain Rupiah yet, append it
-  if (!res.toLowerCase().includes("rupiah")) {
-    res = res + " Rupiah";
-  }
   
-  return res;
+  return res + " Rupiah";
 };
 
 export const generateRincianBiaya = (data: {
