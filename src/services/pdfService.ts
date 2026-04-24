@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 
 interface SppdData {
   nomorSppd?: string;
+  tahun?: string;
   petugas: {
     nama: string;
     niat?: string;
@@ -24,6 +25,7 @@ interface SppdData {
 
 export const generateSpt = (data: {
   nomorSpt?: string;
+  tahun?: string;
   dasarHukum: string[];
   petugas: {
     nama: string;
@@ -97,10 +99,15 @@ export const generateSpt = (data: {
   const textWidth = doc.getTextWidth('SURAT PERINTAH TUGAS');
   doc.line(105 - textWidth/2, 51, 105 + textWidth/2, 51);
   
-  const currentYear = data.tanggal.split('-')[0] || new Date().getFullYear();
+  const currentYear = data.tahun || data.tanggal.split('-')[0] || new Date().getFullYear();
+  let fullNomor = data.nomorSpt || '                ';
+  if (fullNomor && !fullNomor.includes('000.1.2.3')) {
+    fullNomor = `000.1.2.3 / ${fullNomor} / ${currentYear}`;
+  }
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text(`Nomor : 000.1.2.3 / ${data.nomorSpt || '                '} / ${currentYear}`, 105, 56, { align: 'center' });
+  doc.text(`Nomor : ${fullNomor}`, 105, 56, { align: 'center' });
 
   let currentY = 70;
 
@@ -231,6 +238,7 @@ export const terbilang = (n: number): string => {
 
 export const generateRincianBiaya = (data: {
   nomorSppd?: string;
+  tahun?: string;
   tanggalSpt: string;
   petugas: {
     nama: string;
@@ -268,7 +276,13 @@ export const generateRincianBiaya = (data: {
   doc.setFontSize(11);
   doc.text('Lampiran SPD Nomor', 15, 35);
   doc.text(':', 55, 35);
-  doc.text(data.nomorSppd || '...........................................', 60, 35);
+  
+  const currentYear = data.tahun || data.tanggalSpt.split('-')[0] || new Date().getFullYear();
+  let fullNomor = data.nomorSppd || '...........................................';
+  if (fullNomor && fullNomor !== '...........................................' && !fullNomor.includes('000.1.2.3')) {
+    fullNomor = `000.1.2.3 / ${fullNomor} / ${currentYear}`;
+  }
+  doc.text(fullNomor, 60, 35);
 
   doc.text('Tanggal', 15, 41);
   doc.text(':', 55, 41);
@@ -519,9 +533,14 @@ export const generateSppdDepan = (data: SppdData) => {
 
   // KODE DAN NOMOR
   doc.setFontSize(10);
-  const currentYear = data.tanggal.split('-')[0] || new Date().getFullYear();
+  const currentYear = data.tahun || data.tanggal.split('-')[0] || new Date().getFullYear();
+  let fullNomor = data.nomorSppd || '                ';
+  if (fullNomor && !fullNomor.includes('000.1.2.3')) {
+    fullNomor = `000.1.2.3 / ${fullNomor} / ${currentYear}`;
+  }
+
   doc.text('Kode No     : 000.1.2.3', 140, 48);
-  doc.text(`Nomor       : 000.1.2.3 / ${data.nomorSppd || '                '} / ${currentYear}`, 140, 53);
+  doc.text(`Nomor       : ${fullNomor}`, 140, 53);
 
   // JUDUL
   doc.setFont('helvetica', 'bold');

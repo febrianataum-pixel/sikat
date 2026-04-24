@@ -209,6 +209,7 @@ export default function KegiatanPage() {
     if (label === 'sppd_depan') {
       doc = generateSppdDepan({
         nomorSppd: k.nomor,
+        tahun: k.tahun,
         petugas: {
           nama: k.petugasNama,
           niat: (p as any).niat || '-',
@@ -232,6 +233,7 @@ export default function KegiatanPage() {
       const kadisOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA DINAS')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Kepala Dinas' };
       doc = generateSpt({
         nomorSpt: k.nomor,
+        tahun: k.tahun,
         dasarHukum: settings?.dasarHukum || [],
         petugas: {
           nama: k.petugasNama,
@@ -255,6 +257,7 @@ export default function KegiatanPage() {
 
       doc = generateRincianBiaya({
         nomorSppd: k.nomor,
+        tahun: k.tahun,
         tanggalSpt: k.tanggal,
         petugas: {
           nama: k.petugasNama,
