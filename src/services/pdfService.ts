@@ -535,8 +535,10 @@ export const generateSppdDepan = (data: SppdData) => {
   doc.setFontSize(10);
   const currentYear = data.tahun || data.tanggal.split('-')[0] || new Date().getFullYear();
   let fullNomor = data.nomorSppd || '                ';
-  if (fullNomor && !fullNomor.includes('000.1.2.3')) {
-    fullNomor = `000.1.2.3 / ${fullNomor} / ${currentYear}`;
+  
+  // If no year suffix exists and it's not the redundant prefix, append year
+  if (fullNomor && !fullNomor.includes('/') && fullNomor !== '                ') {
+    fullNomor = `${fullNomor} / ${currentYear}`;
   }
 
   doc.text('Kode No     : 000.1.2.3', 140, 48);
