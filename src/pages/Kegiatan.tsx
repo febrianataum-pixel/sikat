@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
@@ -23,8 +23,7 @@ import { DEFAULT_LOGO } from '../constants';
 interface Petugas {
   id: string;
   nama: string;
-  nip?: string;
-  pangkat?: string;
+  niat?: string;
   tingkatSPPD?: string;
   jenis?: string;
 }
@@ -129,7 +128,7 @@ export default function KegiatanPage() {
     return getDownloadURL(snapshot.ref);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault();
     if (!currentKegiatan?.petugasId || !currentKegiatan?.tanggal || !currentKegiatan?.tempat) return;
 
@@ -212,8 +211,7 @@ export default function KegiatanPage() {
         nomorSppd: k.nomor,
         petugas: {
           nama: k.petugasNama,
-          nip: (p as any).nip || '-',
-          pangkat: (p as any).pangkat || '-',
+          niat: (p as any).niat || '-',
           jabatan: (p as any).jenis || '-',
           tingkatSPPD: (p as any).tingkatSPPD || '-'
         },
@@ -236,8 +234,7 @@ export default function KegiatanPage() {
         dasarHukum: settings?.dasarHukum || [],
         petugas: {
           nama: k.petugasNama,
-          nip: (p as any).nip,
-          pangkat: (p as any).pangkat,
+          niat: (p as any).niat,
           jabatan: (p as any).jenis
         },
         maksud: k.uraian,
@@ -292,8 +289,7 @@ export default function KegiatanPage() {
         nomorSppd: k.nomor,
         petugas: {
           nama: k.petugasNama,
-          nip: (p as any).nip || '-',
-          pangkat: (p as any).pangkat || '-',
+          niat: (p as any).niat || '-',
           jabatan: (p as any).jenis || '-',
           tingkatSPPD: (p as any).tingkatSPPD || '-'
         },
@@ -316,8 +312,7 @@ export default function KegiatanPage() {
         dasarHukum: settings?.dasarHukum || [],
         petugas: {
           nama: k.petugasNama,
-          nip: (p as any).nip,
-          pangkat: (p as any).pangkat,
+          niat: (p as any).niat,
           jabatan: (p as any).jenis
         },
         maksud: k.uraian,

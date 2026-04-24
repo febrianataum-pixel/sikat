@@ -5,8 +5,7 @@ interface SppdData {
   nomorSppd?: string;
   petugas: {
     nama: string;
-    nip?: string;
-    pangkat?: string;
+    niat?: string;
     jabatan?: string;
     tingkatSPPD: string;
   };
@@ -28,8 +27,7 @@ export const generateSpt = (data: {
   dasarHukum: string[];
   petugas: {
     nama: string;
-    nip?: string;
-    pangkat?: string;
+    niat?: string;
     jabatan?: string;
   };
   maksud: string;
@@ -132,11 +130,8 @@ export const generateSpt = (data: {
   doc.text('1.  Nama', 40, currentY);
   doc.text(`: ${data.petugas.nama}`, 75, currentY);
   currentY += 5;
-  doc.text('    Pangkat/Gol', 40, currentY);
-  doc.text(`: ${data.petugas.pangkat || '-'}`, 75, currentY);
-  currentY += 5;
-  doc.text('    NIP', 40, currentY);
-  doc.text(`: ${data.petugas.nip || '-'}`, 75, currentY);
+  doc.text('    NIAT', 40, currentY);
+  doc.text(`: ${data.petugas.niat || '-'}`, 75, currentY);
   currentY += 5;
   doc.text('    Jabatan', 40, currentY);
   doc.text(`: ${data.petugas.jabatan || '-'}`, 75, currentY);
@@ -527,10 +522,9 @@ export const generateSppdDepan = (data: SppdData) => {
       ['1.', 'Pejabat Pembuat Komitmen', data.ppk.nama],
       ['2.', 'Pegawai yang melaksanakan perjalanan dinas', ''],
       ['', 'a. Nama', data.petugas.nama],
-      ['', 'b. NIP', data.petugas.nip || '-'],
-      ['', 'c. Pangkat/ Golongan', data.petugas.pangkat || '-'],
-      ['', 'd. Jabatan', data.petugas.jabatan || '-'],
-      ['', 'e. Tingkat biaya Perjalanan Dinas', data.petugas.tingkatSPPD],
+      ['', 'b. NIAT', data.petugas.niat || '-'],
+      ['', 'c. Jabatan', data.petugas.jabatan || '-'],
+      ['', 'd. Tingkat biaya Perjalanan Dinas', data.petugas.tingkatSPPD],
       ['3.', 'Maksud Perjalanan Dinas', data.uraian],
       ['4.', 'Alat Angkutan yang dipergunakan', 'Kendaraan Dinas'],
       ['5.', 'a. Tempat Berangkat', 'Dinsos PPPA Kab. Blora'],
@@ -642,7 +636,7 @@ export const generateSppdDepan = (data: SppdData) => {
   // Names
   doc.text(data.petugas.nama, 30, finalY + 40);
   doc.setFont('helvetica', 'normal');
-  doc.text('NIP : ' + (data.petugas.nip || '-'), 30, finalY + 45);
+  doc.text('NIAT : ' + (data.petugas.niat || '-'), 30, finalY + 45);
 
   doc.setFont('helvetica', 'bold');
   doc.text(data.ppk.nama, 130, finalY + 40);

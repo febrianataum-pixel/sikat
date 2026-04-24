@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
@@ -7,10 +7,9 @@ import { motion, AnimatePresence } from 'motion/react';
 interface Petugas {
   id: string;
   nama: string;
-  nip: string;
-  pangkat: string;
+  niat: string;
   tingkatSPPD: string;
-  jenis: 'TKSK' | 'TAGANA' | 'ASN' | 'PPPK';
+  jenis: 'TKSK Blora' | 'TAGANA Blora' | 'ASN' | 'PPPK';
   kontak?: string;
   keterangan?: string;
 }
@@ -40,7 +39,7 @@ export default function PetugasPage() {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault();
     if (!currentPetugas?.nama || !currentPetugas?.jenis) return;
 
@@ -48,8 +47,7 @@ export default function PetugasPage() {
       if (currentPetugas.id) {
         await updateDoc(doc(db, 'petugas', currentPetugas.id), {
           nama: currentPetugas.nama,
-          nip: currentPetugas.nip || '',
-          pangkat: currentPetugas.pangkat || '',
+          niat: currentPetugas.niat || '',
           tingkatSPPD: currentPetugas.tingkatSPPD || '',
           jenis: currentPetugas.jenis,
           kontak: currentPetugas.kontak || '',
@@ -58,8 +56,7 @@ export default function PetugasPage() {
       } else {
         await addDoc(collection(db, 'petugas'), {
           nama: currentPetugas.nama,
-          nip: currentPetugas.nip || '',
-          pangkat: currentPetugas.pangkat || '',
+          niat: currentPetugas.niat || '',
           tingkatSPPD: currentPetugas.tingkatSPPD || '',
           jenis: currentPetugas.jenis,
           kontak: currentPetugas.kontak || '',
@@ -87,6 +84,11 @@ export default function PetugasPage() {
     }
   };
 
+  const handleFilter = () => {
+    // Note: 'petugas' data already loaded with 'niat' instead of 'nip'
+    fetchPetugas();
+  };
+
   const filteredPetugas = petugas.filter(p => 
     p.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.jenis.toLowerCase().includes(searchTerm.toLowerCase())
@@ -107,7 +109,7 @@ export default function PetugasPage() {
         </div>
         <button
           onClick={() => {
-            setCurrentPetugas({ jenis: 'TKSK' });
+            setCurrentPetugas({ jenis: 'TKSK Blora' });
             setIsModalOpen(true);
           }}
           className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors"
@@ -138,12 +140,12 @@ export default function PetugasPage() {
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="font-semibold text-slate-800">{p.nama}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">{p.nip || 'Tanpa NIP'}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">{p.niat || 'Tanpa NIAT'}</div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                       p.jenis === 'ASN' || p.jenis === 'PPPK' ? 'bg-indigo-600 text-white' : 
-                      p.jenis === 'TKSK' ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'
+                      p.jenis.includes('TKSK') ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'
                     }`}>
                       {p.jenis}
                     </span>
@@ -205,7 +207,7 @@ export default function PetugasPage() {
               </div>
 
               <form onSubmit={handleSave} className="space-y-5">
-                {/* Row 1: Nama & NIP */}
+                {/* Row 1: Nama & NIAT */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nama Lengkap *</label>
@@ -218,37 +220,27 @@ export default function PetugasPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">NIP / NIK</label>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">NIAT (Nomor Induk Tagana/TKSK)</label>
                     <input
                       type="text"
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-                      value={currentPetugas?.nip || ''}
-                      onChange={(e) => setCurrentPetugas({ ...currentPetugas, nip: e.target.value })}
+                      value={currentPetugas?.niat || ''}
+                      onChange={(e) => setCurrentPetugas({ ...currentPetugas, niat: e.target.value })}
                     />
                   </div>
                 </div>
 
-                {/* Row 2: Pangkat & Jenis */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pangkat / Golongan</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-                      placeholder="Contoh: Penata / III.c"
-                      value={currentPetugas?.pangkat || ''}
-                      onChange={(e) => setCurrentPetugas({ ...currentPetugas, pangkat: e.target.value })}
-                    />
-                  </div>
+                {/* Row 2: Jenis */}
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Jenis Petugas</label>
                     <select
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-                      value={currentPetugas?.jenis || 'TKSK'}
+                      value={currentPetugas?.jenis || 'TKSK Blora'}
                       onChange={(e) => setCurrentPetugas({ ...currentPetugas, jenis: e.target.value as any })}
                     >
-                      <option value="TKSK">TKSK</option>
-                      <option value="TAGANA">TAGANA</option>
+                      <option value="TKSK Blora">TKSK Blora</option>
+                      <option value="TAGANA Blora">TAGANA Blora</option>
                       <option value="ASN">ASN</option>
                       <option value="PPPK">PPPK</option>
                     </select>

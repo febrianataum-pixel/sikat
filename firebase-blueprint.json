@@ -8,7 +8,7 @@
         "nama": { "type": "string", "description": "Nama lengkap petugas" },
         "niat": { "type": "string", "description": "Nomor Induk Anggota Tagana / TKSK" },
         "tingkatSPPD": { "type": "string", "description": "Tingkat/Golongan SPPD" },
-        "jenis": { "type": "string", "enum": ["TKSK", "TAGANA"], "description": "Kategori petugas" },
+        "jenis": { "type": "string", "enum": ["TKSK Blora", "TAGANA Blora", "ASN", "PPPK"], "description": "Kategori petugas" },
         "kontak": { "type": "string", "description": "Nomor WhatsApp atau telepon" },
         "keterangan": { "type": "string", "description": "Catatan tambahan" },
         "createdAt": { "type": "string", "format": "date-time" },
