@@ -34,6 +34,7 @@ export default function UtilitasPage() {
 
   // Form States
   const [settings, setSettings] = useState({ logoUrl: DEFAULT_LOGO, dasarHukum: [] as string[] });
+  const [logoUrlInput, setLogoUrlInput] = useState(DEFAULT_LOGO);
   const [newDasarHukum, setNewDasarHukum] = useState('');
   const [isAddingDasarHukum, setIsAddingDasarHukum] = useState(false);
   const [subKegiatan, setSubKegiatan] = useState<{id?: string, kode: string, nama: string}[]>([]);
@@ -58,19 +59,23 @@ export default function UtilitasPage() {
         const docSnap = await getDoc(doc(db, 'settings', 'general'));
         if (docSnap.exists()) {
           const data = docSnap.data();
+          const logo = data.logoUrl || DEFAULT_LOGO;
           setSettings({ 
-            logoUrl: data.logoUrl || DEFAULT_LOGO, 
+            logoUrl: logo, 
             dasarHukum: Array.isArray(data.dasarHukum) ? data.dasarHukum : [] 
           });
+          setLogoUrlInput(logo);
         } else {
           // Fallback check collection for any doc (legacy)
           const snap = await getDocs(collection(db, 'settings'));
           if (!snap.empty) {
              const data = snap.docs[0].data();
+             const logo = data.logoUrl || DEFAULT_LOGO;
              setSettings({ 
-               logoUrl: data.logoUrl || DEFAULT_LOGO, 
+               logoUrl: logo, 
                dasarHukum: Array.isArray(data.dasarHukum) ? data.dasarHukum : [] 
              });
+             setLogoUrlInput(logo);
           }
         }
       } else if (activeTab === 'sub_kegiatan') {
@@ -101,35 +106,31 @@ export default function UtilitasPage() {
   const handleSaveUmum = async () => {
     setLoading(true);
     try {
-      await setDoc(doc(db, 'settings', 'general'), settings);
+      const nextSettings = { ...settings, logoUrl: logoUrlInput };
+      await setDoc(doc(db, 'settings', 'general'), nextSettings);
+      setSettings(nextSettings);
       showSuccess('Pengaturan umum berhasil disimpan');
     } catch (err) {
       console.error(err);
+      alert('Gagal menyimpan pengaturan.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleUpdateLogo = async () => {
+    if (!logoUrlInput.trim()) return;
     setLoading(true);
     try {
-      const storageRef = ref(storage, `logo/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
-      
-      const nextSettings = { ...settings, logoUrl: url };
+      const nextSettings = { ...settings, logoUrl: logoUrlInput.trim() };
       await setDoc(doc(db, 'settings', 'general'), nextSettings);
       setSettings(nextSettings);
-
-      showSuccess('Logo KOP berhasil diunggah dan disimpan');
+      showSuccess('Logo KOP berhasil diperbarui');
     } catch (err) {
-      console.error("Upload error:", err);
-      alert('Gagal mengunggah logo. Pastikan file valid.');
+      console.error("Update logo error:", err);
+      alert('Gagal memperbarui logo.');
     } finally {
       setLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -306,24 +307,30 @@ export default function UtilitasPage() {
                         <ImageIcon size={48} className="text-slate-200" />
                       )}
                     </div>
-                    <div className="space-y-4">
-                      <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
-                      >
-                        <Upload size={18} />
-                        Upload Logo Baru
-                      </button>
-                      <p className="text-[11px] text-slate-400 font-medium leading-relaxed italic max-w-xs">
-                        Format: PNG, JPG (Maks. 1MB). Disarankan background transparan untuk hasil kop surat terbaik.
+                    <div className="flex-1 space-y-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">URL Gambar Logo</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
+                            placeholder="Tempel URL logo di sini (https://...)"
+                            value={logoUrlInput}
+                            onChange={(e) => setLogoUrlInput(e.target.value)}
+                          />
+                          <button 
+                            onClick={handleUpdateLogo}
+                            disabled={loading || !logoUrlInput.trim()}
+                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
+                          >
+                            <Save size={18} />
+                            Simpan
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-medium leading-relaxed italic max-w-md">
+                        Tempelkan link/URL gambar logo Kabupaten atau Instansi. Tips: Klik kanan gambar di web, lalu pilih "Copy Image Address".
                       </p>
-                      <input 
-                        ref={fileInputRef}
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleLogoUpload}
-                        className="hidden" 
-                      />
                     </div>
                   </div>
                 </div>

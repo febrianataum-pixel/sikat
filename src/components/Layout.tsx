@@ -20,8 +20,8 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Data Petugas', href: '/petugas', icon: Users },
   { name: 'Log Kegiatan', href: '/kegiatan', icon: Calendar },
-  { name: 'Utilitas & Pengaturan', href: '/utilitas', icon: Settings },
   { name: 'Arsip Laporan', href: '/laporan', icon: FileText },
+  { name: 'Utilitas & Pengaturan', href: '/utilitas', icon: Settings },
 ];
 
 export default function Layout() {
