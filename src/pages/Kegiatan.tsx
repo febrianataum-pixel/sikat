@@ -138,9 +138,7 @@ export default function KegiatanPage() {
       
       const isComplete = !!(currentKegiatan.hasLaporan && currentKegiatan.hasDokumentasi && currentKegiatan.hasSppd);
 
-      const fullNomor = currentKegiatan.nomorUrut 
-        ? `000.1.2.3 / ${currentKegiatan.nomorUrut} / ${currentKegiatan.tahun || new Date().getFullYear()}`
-        : (currentKegiatan.nomor || '');
+      const fullNomor = currentKegiatan.nomorUrut || '';
 
       const data = {
         petugasId: currentKegiatan.petugasId,

@@ -97,7 +97,7 @@ export const generateSpt = (data: {
   const textWidth = doc.getTextWidth('SURAT PERINTAH TUGAS');
   doc.line(105 - textWidth/2, 51, 105 + textWidth/2, 51);
   
-  const currentYear = new Date().getFullYear();
+  const currentYear = data.tanggal.split('-')[0] || new Date().getFullYear();
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text(`Nomor : 000.1.2.3 / ${data.nomorSpt || '                '} / ${currentYear}`, 105, 56, { align: 'center' });
@@ -519,8 +519,9 @@ export const generateSppdDepan = (data: SppdData) => {
 
   // KODE DAN NOMOR
   doc.setFontSize(10);
+  const currentYear = data.tanggal.split('-')[0] || new Date().getFullYear();
   doc.text('Kode No     : 000.1.2.3', 140, 48);
-  doc.text('Nomor       : ' + (data.nomorSppd || '...........................................'), 140, 53);
+  doc.text(`Nomor       : 000.1.2.3 / ${data.nomorSppd || '                '} / ${currentYear}`, 140, 53);
 
   // JUDUL
   doc.setFont('helvetica', 'bold');
