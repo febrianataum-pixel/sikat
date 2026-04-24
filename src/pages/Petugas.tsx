@@ -9,7 +9,7 @@ interface Petugas {
   nama: string;
   niat: string;
   tingkatSPPD: string;
-  jenis: 'TKSK Blora' | 'TAGANA Blora' | 'ASN' | 'PPPK';
+  jenis: 'TKSK Blora' | 'TAGANA Blora';
   kontak?: string;
   keterangan?: string;
 }
@@ -144,8 +144,7 @@ export default function PetugasPage() {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      p.jenis === 'ASN' || p.jenis === 'PPPK' ? 'bg-indigo-600 text-white' : 
-                      p.jenis.includes('TKSK') ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'
+                      p.jenis === 'TKSK Blora' ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'
                     }`}>
                       {p.jenis}
                     </span>
@@ -241,8 +240,6 @@ export default function PetugasPage() {
                     >
                       <option value="TKSK Blora">TKSK Blora</option>
                       <option value="TAGANA Blora">TAGANA Blora</option>
-                      <option value="ASN">ASN</option>
-                      <option value="PPPK">PPPK</option>
                     </select>
                   </div>
                 </div>

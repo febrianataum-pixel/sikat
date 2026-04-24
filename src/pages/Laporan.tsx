@@ -22,6 +22,7 @@ interface Petugas {
 
 interface Kegiatan {
   id: string;
+  petugasId: string;
   petugasNama: string;
   tanggal: string;
   tempat: string;
@@ -86,24 +87,23 @@ export default function LaporanPage() {
   const handleFilter = async () => {
     setLoading(true);
     try {
-      let q = query(collection(db, 'kegiatan'), orderBy('tanggal', 'asc'));
-      
-      if (selectedPetugas) {
-        q = query(q, where('petugasId', '==', selectedPetugas));
-      }
-
+      // Fetch all kegiatan first, ordered by date
+      // We do filtering in memory to avoid complex Firestore composite index requirements
+      const q = query(collection(db, 'kegiatan'), orderBy('tanggal', 'asc'));
       const snap = await getDocs(q);
       const allData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kegiatan));
 
-      // Filter by month and year in JS to avoid complex Firestore indexing during dev
       const filtered = allData.filter(item => {
         const d = new Date(item.tanggal);
-        return (d.getMonth() + 1 === Number(month)) && (d.getFullYear() === Number(year));
+        const matchDate = (d.getMonth() + 1 === Number(month)) && (d.getFullYear() === Number(year));
+        const matchPetugas = selectedPetugas ? item.petugasId === selectedPetugas : true;
+        return matchDate && matchPetugas;
       });
 
       setData(filtered);
     } catch (err) {
-      console.error(err);
+      console.error("Filter error:", err);
+      alert("Gagal memuat data laporan.");
     } finally {
       setLoading(false);
     }

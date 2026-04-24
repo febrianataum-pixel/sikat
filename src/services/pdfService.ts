@@ -202,18 +202,28 @@ export const terbilang = (n: number): string => {
   let res = "";
   
   if (n < 12) res = units[n];
-  else if (n < 20) res = terbilang(n - 10) + " Belas";
-  else if (n < 100) res = terbilang(Math.floor(n / 10)) + " Puluh " + terbilang(n % 10);
+  else if (n < 20) res = units[n - 10] + " Belas";
+  else if (n < 100) res = units[Math.floor(n / 10)] + " Puluh " + units[n % 10];
   else if (n < 200) res = "Seratus " + terbilang(n - 100);
-  else if (n < 1000) res = terbilang(Math.floor(n / 100)) + " Ratus " + terbilang(n % 100);
+  else if (n < 1000) res = units[Math.floor(n / 100)] + " Ratus " + terbilang(n % 100);
   else if (n < 2000) res = "Seribu " + terbilang(n - 1000);
   else if (n < 1000000) res = terbilang(Math.floor(n / 1000)) + " Ribu " + terbilang(n % 1000);
   else if (n < 1000000000) res = terbilang(Math.floor(n / 1000000)) + " Juta " + terbilang(n % 1000000);
   else res = terbilang(Math.floor(n / 1000000000)) + " Miliar " + terbilang(n % 1000000000);
   
-  res = res.replace(/\s+/g, " ").trim();
-  if (res.endsWith("Rupiah")) return res;
-  return res + " Rupiah";
+  // Specific Indonesian language fixes
+  res = res.replace("Satu Puluh", "Sepuluh")
+           .replace("Satu Ratus", "Seratus")
+           .replace("Satu Ribu", "Seribu")
+           .replace(/\s+/g, " ")
+           .trim();
+
+  // If the result doesn't contain Rupiah yet, append it
+  if (!res.toLowerCase().includes("rupiah")) {
+    res = res + " Rupiah";
+  }
+  
+  return res;
 };
 
 export const generateRincianBiaya = (data: {
