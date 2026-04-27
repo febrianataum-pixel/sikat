@@ -81,6 +81,11 @@ export default function KegiatanPage() {
   const [biayaPerjalanan, setBiayaPerjalanan] = useState<{ id: string, tingkat: string, jenis: string, nominal: number }[]>([]);
   const [bbm, setBbm] = useState<{ id: string, jenis: string, harga: number }[]>([]);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterPetugas, setFilterPetugas] = useState('');
+  const [filterSubKegiatan, setFilterSubKegiatan] = useState('');
+
   const { role, userProfile, loading: roleLoading } = useUserRole(auth.currentUser);
 
   useEffect(() => {
@@ -88,6 +93,21 @@ export default function KegiatanPage() {
       fetchData();
     }
   }, [role, roleLoading, userProfile]);
+
+  const filteredKegiatanList = kegiatan.filter(k => {
+    const matchesSearch = !searchTerm || 
+      k.petugasNama.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      k.tempat.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      k.uraian.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesPetugas = !filterPetugas || k.petugasId === filterPetugas;
+    
+    const matchesMonth = !filterMonth || k.tanggal.startsWith(filterMonth);
+
+    const matchesSub = !filterSubKegiatan || k.subKegiatanId === filterSubKegiatan;
+
+    return matchesSearch && matchesPetugas && matchesMonth && matchesSub;
+  });
 
   const fetchData = async () => {
     if (roleLoading || !role) return;
@@ -434,6 +454,47 @@ export default function KegiatanPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        {role === 'admin' && (
+          <div className="p-4 border-b border-slate-200 bg-slate-50/50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input 
+                type="text"
+                placeholder="Cari petugas, tempat, atau uraian..."
+                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <select
+              className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+              value={filterPetugas}
+              onChange={(e) => setFilterPetugas(e.target.value)}
+            >
+              <option value="">Semua Petugas</option>
+              {petugas.map(p => (
+                <option key={p.id} value={p.id}>{p.nama}</option>
+              ))}
+            </select>
+            <select
+              className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+              value={filterSubKegiatan}
+              onChange={(e) => setFilterSubKegiatan(e.target.value)}
+            >
+              <option value="">Semua Sub Kegiatan</option>
+              {subKegiatan.map(s => (
+                <option key={s.id} value={s.id}>{s.nama}</option>
+              ))}
+            </select>
+            <input 
+              type="month"
+              className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
@@ -449,9 +510,9 @@ export default function KegiatanPage() {
             <tbody className="divide-y divide-slate-50 text-sm text-slate-600">
               {loading ? (
                 <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">Sinkronisasi data harian...</td></tr>
-              ) : kegiatan.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">Belum ada rekaman kegiatan.</td></tr>
-              ) : kegiatan.map((k) => (
+              ) : filteredKegiatanList.length === 0 ? (
+                <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">Belum ada rekaman kegiatan yang sesuai.</td></tr>
+              ) : filteredKegiatanList.map((k) => (
                 <tr key={k.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <button

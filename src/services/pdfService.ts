@@ -267,8 +267,9 @@ export const generateRincianBiaya = (data: {
     format: 'a4'
   });
 
-  const total = data.rincian.reduce((acc, curr) => acc + (curr.nominal * curr.hari), 0);
-  const terbilangText = terbilang(total);
+  const harianItem = data.rincian.find(item => item.uraian.toLowerCase().includes('harian')) || data.rincian[0];
+  const finalTotal = harianItem.nominal * harianItem.hari;
+  const terbilangText = terbilang(finalTotal);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -293,15 +294,15 @@ export const generateRincianBiaya = (data: {
   const formattedDate = dateArr.length === 3 ? `${dateArr[2]} ${months[parseInt(dateArr[1]) - 1]} ${dateArr[0]}` : data.tanggalSpt;
   doc.text(formattedDate, 60, 41);
 
-  const tableData = data.rincian.map((item, i) => [
-    i + 1,
+  const tableData = [[
+    1,
     data.petugas.nama,
-    item.nominal.toLocaleString('id-ID'),
-    item.hari,
-    (item.nominal * item.hari).toLocaleString('id-ID'),
+    harianItem.nominal.toLocaleString('id-ID'),
+    harianItem.hari,
+    finalTotal.toLocaleString('id-ID'),
     data.petugas.tingkatSPPD,
-    `${i + 1}.`
-  ]);
+    '1.'
+  ]];
 
   autoTable(doc, {
     startY: 50,
@@ -310,7 +311,7 @@ export const generateRincianBiaya = (data: {
       ...tableData,
       [
         { content: 'JUMLAH TOTAL', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } }, 
-        { content: total.toLocaleString('id-ID'), styles: { fontStyle: 'bold', halign: 'right' } }, 
+        { content: finalTotal.toLocaleString('id-ID'), styles: { fontStyle: 'bold', halign: 'right' } }, 
         { content: '', colSpan: 2 }
       ]
     ],
@@ -345,10 +346,10 @@ export const generateRincianBiaya = (data: {
   currentY += 10;
   doc.setFont('helvetica', 'normal');
   doc.text('ditetapkan Sejumlah', 15, currentY);
-  doc.text(`Rp ${total.toLocaleString('id-ID')}`, 105, currentY);
+  doc.text(`Rp ${finalTotal.toLocaleString('id-ID')}`, 105, currentY);
   currentY += 6;
   doc.text('yang telah dibayar semula', 15, currentY);
-  doc.text(`Rp ${total.toLocaleString('id-ID')}`, 105, currentY);
+  doc.text(`Rp ${finalTotal.toLocaleString('id-ID')}`, 105, currentY);
   currentY += 6;
   doc.text('sisa kurang / lebih', 15, currentY);
   doc.text('Rp -', 105, currentY);
