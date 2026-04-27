@@ -1,18 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from '../lib/firebase';
 import { useUserRole } from '../hooks/useUserRole';
-import { User, Mail, Shield, UserCheck, Save, Loader2 } from 'lucide-react';
+import { User, Mail, Shield, UserCheck, Save, Loader2, Camera, X } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function Profile() {
   const { role, userProfile, loading: roleLoading } = useUserRole(auth.currentUser);
   const [petugasList, setPetugasList] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: '',
     petugasId: '',
-    phone: ''
+    phone: '',
+    photoURL: ''
   });
 
   useEffect(() => {
@@ -20,7 +24,8 @@ export default function Profile() {
       setFormData({
         name: userProfile.name || '',
         petugasId: userProfile.petugasId || '',
-        phone: (userProfile as any).phone || ''
+        phone: (userProfile as any).phone || '',
+        photoURL: (userProfile as any).photoURL || ''
       });
     }
 
@@ -38,7 +43,8 @@ export default function Profile() {
       await updateDoc(doc(db, 'users', auth.currentUser.uid), {
         name: formData.name,
         petugasId: formData.petugasId,
-        phone: formData.phone
+        phone: formData.phone,
+        photoURL: formData.photoURL
       });
       alert('Profil berhasil diperbaharui!');
       window.location.reload(); 
@@ -47,6 +53,29 @@ export default function Profile() {
       alert('Gagal menyimpan profil.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !auth.currentUser) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Ukuran foto maksimal 2MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `profiles/${auth.currentUser.uid}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setFormData(prev => ({ ...prev, photoURL: url }));
+    } catch (err) {
+      console.error(err);
+      alert('Gagal mengupload foto.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -63,10 +92,32 @@ export default function Profile() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="h-32 bg-indigo-600 relative">
           <div className="absolute -bottom-10 left-8">
-            <div className="w-24 h-24 rounded-2xl bg-white p-1 shadow-lg">
-              <div className="w-full h-full rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700">
-                <User size={48} />
+            <div className="w-24 h-24 rounded-2xl bg-white p-1 shadow-lg group relative">
+              <div className="w-full h-full rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 overflow-hidden">
+                {formData.photoURL ? (
+                  <img src={formData.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <User size={48} />
+                )}
+                {uploading && (
+                  <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                    <Loader2 className="animate-spin text-indigo-600" size={24} />
+                  </div>
+                )}
               </div>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute -right-2 -bottom-2 w-8 h-8 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-indigo-600 hover:text-indigo-700 hover:scale-110 transition-all active:scale-95"
+              >
+                <Camera size={16} />
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                className="hidden" 
+                accept="image/*"
+              />
             </div>
           </div>
         </div>

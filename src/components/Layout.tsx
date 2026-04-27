@@ -92,8 +92,12 @@ export default function Layout() {
 
           <div className="p-4 border-t border-slate-100">
             <div className="flex items-center gap-3 mb-4 px-2">
-              <div className="w-10 h-10 rounded-full bg-indigo-50 border-2 border-white overflow-hidden flex items-center justify-center text-indigo-700 text-xs font-bold">
-                {auth.currentUser?.email?.[0].toUpperCase()}
+              <div className="w-10 h-10 rounded-full bg-indigo-50 border-2 border-white overflow-hidden flex items-center justify-center text-indigo-700 text-xs font-bold ring-2 ring-indigo-50/50">
+                {(userProfile as any)?.photoURL ? (
+                  <img src={(userProfile as any).photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  auth.currentUser?.email?.[0].toUpperCase()
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-800 truncate">{userProfile?.name || 'User'}</p>
