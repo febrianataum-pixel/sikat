@@ -398,28 +398,30 @@ export default function KegiatanPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight text-slate-800">Log Kegiatan Harian</h2>
-        <button
-          onClick={() => {
-            const defaultPetugasId = (role === 'petugas' && userProfile?.petugasId) ? userProfile.petugasId : '';
-            let defaultSub = '';
-            if (role === 'petugas' && subKegiatan.length > 0) {
-              const targetSub = subKegiatan.find(s => s.nama.toLowerCase().includes('peningkatan kemampuan potensi sumber kesejahteraan sosial'));
-              if (targetSub) defaultSub = targetSub.id;
-            }
-            setCurrentKegiatan({ 
-              tanggal: new Date().toISOString().split('T')[0], 
-              laporanSelesai: false,
-              tahun: new Date().getFullYear().toString(),
-              petugasId: defaultPetugasId,
-              subKegiatanId: defaultSub
-            });
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors"
-        >
-          <Plus size={18} />
-          Input Kegiatan
-        </button>
+        {role !== 'petugas' && (
+          <button
+            onClick={() => {
+              const defaultPetugasId = (role === 'petugas' && userProfile?.petugasId) ? userProfile.petugasId : '';
+              let defaultSub = '';
+              if (role === 'petugas' && subKegiatan.length > 0) {
+                const targetSub = subKegiatan.find(s => s.nama.toLowerCase().includes('peningkatan kemampuan potensi sumber kesejahteraan sosial'));
+                if (targetSub) defaultSub = targetSub.id;
+              }
+              setCurrentKegiatan({ 
+                tanggal: new Date().toISOString().split('T')[0], 
+                laporanSelesai: false,
+                tahun: new Date().getFullYear().toString(),
+                petugasId: defaultPetugasId,
+                subKegiatanId: defaultSub
+              });
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors"
+          >
+            <Plus size={18} />
+            Input Kegiatan
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
