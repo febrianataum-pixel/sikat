@@ -70,7 +70,14 @@ export default function InputCepat() {
     if (userProfile?.petugasId && !formData.petugasId) {
       setFormData(prev => ({ ...prev, petugasId: userProfile.petugasId || '' }));
     }
-  }, [userProfile, formData.petugasId]);
+    // Set default sub-activity for petugas
+    if (userProfile?.role === 'petugas' && !formData.subKegiatanId && subKegiatan.length > 0) {
+      const targetSub = subKegiatan.find(s => s.nama.includes('Peningkatan Kemampuan Potensi Sumber Kesejahteraan Sosial'));
+      if (targetSub) {
+        setFormData(prev => ({ ...prev, subKegiatanId: targetSub.id }));
+      }
+    }
+  }, [userProfile, formData.petugasId, subKegiatan]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -170,15 +177,16 @@ export default function InputCepat() {
               <div className="relative">
                 <button
                   type="button"
+                  disabled={userProfile?.role === 'petugas'}
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-left"
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-left disabled:bg-slate-100 disabled:text-slate-500"
                 >
                   <span className={formData.petugasId ? "text-slate-800 font-bold" : "text-slate-400"}>
                     {formData.petugasId 
                       ? petugas.find(p => p.id === formData.petugasId)?.nama 
                       : "-- Pilih Nama Anda --"}
                   </span>
-                  <ChevronDown size={18} className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  {userProfile?.role !== 'petugas' && <ChevronDown size={18} className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />}
                 </button>
 
                 <AnimatePresence>
@@ -257,7 +265,8 @@ export default function InputCepat() {
               </label>
               <select
                 required
-                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none"
+                disabled={userProfile?.role === 'petugas'}
+                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none disabled:bg-slate-100 disabled:text-slate-500"
                 value={formData.subKegiatanId}
                 onChange={(e) => setFormData({ ...formData, subKegiatanId: e.target.value })}
               >

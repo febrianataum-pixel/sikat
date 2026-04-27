@@ -401,11 +401,17 @@ export default function KegiatanPage() {
         <button
           onClick={() => {
             const defaultPetugasId = (role === 'petugas' && userProfile?.petugasId) ? userProfile.petugasId : '';
+            let defaultSub = '';
+            if (role === 'petugas' && subKegiatan.length > 0) {
+              const targetSub = subKegiatan.find(s => s.nama.toLowerCase().includes('peningkatan kemampuan potensi sumber kesejahteraan sosial'));
+              if (targetSub) defaultSub = targetSub.id;
+            }
             setCurrentKegiatan({ 
               tanggal: new Date().toISOString().split('T')[0], 
               laporanSelesai: false,
               tahun: new Date().getFullYear().toString(),
-              petugasId: defaultPetugasId
+              petugasId: defaultPetugasId,
+              subKegiatanId: defaultSub
             });
             setIsModalOpen(true);
           }}
@@ -668,7 +674,8 @@ export default function KegiatanPage() {
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sub Kegiatan / Mata Anggaran *</label>
                   <select
                     required
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm"
+                    disabled={role === 'petugas'}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm disabled:bg-slate-100 disabled:text-slate-500"
                     value={currentKegiatan?.subKegiatanId || ''}
                     onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, subKegiatanId: e.target.value })}
                   >
