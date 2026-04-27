@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { Users, Calendar, CheckCircle2, ListTodo, FileText, ChevronRight, X, ArrowLeft } from 'lucide-react';
+import { db, auth } from '../lib/firebase';
+import { Users, Calendar, CheckCircle2, ListTodo, FileText, ChevronRight, X, ArrowLeft, Smartphone, PlusCircle, UserCircle } from 'lucide-react';
 import { formatDate } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '../hooks/useUserRole';
 import { 
   BarChart, 
   Bar, 
@@ -40,6 +42,8 @@ interface ChartItem {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const { role, userProfile, loading: roleLoading } = useUserRole(auth.currentUser);
   const [stats, setStats] = useState({
     totalPetugas: 0,
     totalKegiatan: 0,
@@ -123,7 +127,102 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) return null;
+  if (loading || roleLoading) return null;
+
+  if (role === 'petugas') {
+    return (
+      <div className="space-y-8">
+        <header className="flex flex-col gap-2">
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Halo, {userProfile?.name}! 👋</h2>
+          <p className="text-slate-500 font-medium italic">"Semoga harimu menyenangkan dan penuh pengabdian."</p>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Quick Input Card */}
+          <motion.div 
+            whileHover={{ y: -5 }}
+            onClick={() => navigate('/input')}
+            className="p-8 bg-indigo-600 rounded-[32px] shadow-2xl shadow-indigo-200 cursor-pointer group flex flex-col justify-between min-h-[220px]"
+          >
+            <div className="flex justify-between items-start">
+              <div className="w-14 h-14 bg-indigo-500 rounded-2xl flex items-center justify-center text-white shadow-inner">
+                <PlusCircle size={32} />
+              </div>
+              <div className="bg-indigo-500/30 px-3 py-1 rounded-full text-[10px] font-bold text-indigo-100 uppercase tracking-widest border border-indigo-400/30">
+                Layanan Cepat
+              </div>
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-white mb-2">Tambah Kegiatan</h3>
+              <p className="text-indigo-100 text-sm leading-relaxed opacity-80">
+                Input laporan kegiatan harian Anda dengan mudah langsung dari smartphone.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Profile Card */}
+          <motion.div 
+            whileHover={{ y: -5 }}
+            onClick={() => navigate('/profile')}
+            className="p-8 bg-white border border-slate-200 rounded-[32px] shadow-xl shadow-slate-100 cursor-pointer group flex flex-col justify-between min-h-[220px]"
+          >
+            <div className="flex justify-between items-start">
+              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                <UserCircle size={32} />
+              </div>
+              <div className="bg-slate-100 px-3 py-1 rounded-full text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-200">
+                Pengaturan Akun
+              </div>
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">Profil Saya</h3>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                Kelola informasi akun dan tautkan ke basis data petugas Anda.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Calendar size={20} className="text-indigo-600" /> Riwayat Terakhir Anda
+            </h3>
+            <button 
+              onClick={() => navigate('/kegiatan')}
+              className="text-xs font-bold text-indigo-600 uppercase tracking-widest hover:underline"
+            >
+              Lihat Semua
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            {kegiatanData.filter(k => k.petugasId === userProfile?.petugasId).slice(0, 5).map(act => (
+              <div key={act.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex flex-col items-center justify-center text-[10px] font-bold text-slate-400 uppercase">
+                  <span className="text-slate-800 text-sm">{act.tanggal.split('-')[2]}</span>
+                  {new Date(act.tanggal).toLocaleString('id-ID', { month: 'short' })}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">{act.uraian}</p>
+                  <p className="text-xs text-slate-500">{act.tempat}</p>
+                </div>
+                <ChevronRight size={16} className="text-slate-300" />
+              </div>
+            ))}
+            {kegiatanData.filter(k => k.petugasId === userProfile?.petugasId).length === 0 && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                  <ListTodo size={32} />
+                </div>
+                <p className="text-slate-400 italic text-sm">Belum ada riwayat kegiatan hari ini.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -223,6 +322,24 @@ export default function Dashboard() {
               >
                 <h3 className="font-bold text-slate-700 mb-6 uppercase text-xs tracking-widest">Informasi Sistem</h3>
                 <div className="space-y-4">
+                  <div 
+                    onClick={() => navigate('/input')}
+                    className="p-4 bg-indigo-600 rounded-2xl border border-indigo-500 shadow-lg shadow-indigo-100 group cursor-pointer active:scale-[0.98] transition-all"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white">
+                        <Smartphone size={18} />
+                      </div>
+                      <h4 className="font-bold text-white text-sm">Mode Smartphone</h4>
+                    </div>
+                    <p className="text-[11px] text-indigo-100 leading-relaxed mb-3">
+                      Klik di sini untuk mengakses tampilan input cepat yang dioptimalkan untuk HP petugas di lapangan.
+                    </p>
+                    <div className="flex items-center text-[10px] font-bold text-white uppercase tracking-widest">
+                      BUKA INPUT CEPAT <ChevronRight size={12} className="ml-1" />
+                    </div>
+                  </div>
+
                   <div className="p-4 bg-indigo-50/50 rounded-lg border border-indigo-100">
                     <h4 className="font-bold text-indigo-900 text-sm mb-1 uppercase tracking-tight">Pemberitahuan</h4>
                     <p className="text-xs text-indigo-700 leading-relaxed">

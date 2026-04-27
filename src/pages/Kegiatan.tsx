@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { db, storage, auth } from '../lib/firebase';
 import { 
   Plus, 
   Edit2, 
@@ -46,6 +46,8 @@ interface Kegiatan {
   laporanSelesai: boolean;
   createdAt: string;
   updatedAt: string;
+  createdByEmail?: string;
+  createdByNama?: string;
   jenisWilayah?: 'Luar Daerah' | 'Dalam Daerah';
   biayaTransport?: number;
 }
@@ -165,7 +167,9 @@ export default function KegiatanPage() {
       } else {
         await addDoc(collection(db, 'kegiatan'), {
           ...data,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          createdByEmail: auth.currentUser?.email || 'N/A',
+          createdByNama: auth.currentUser?.displayName || 'N/A'
         });
       }
 
@@ -401,15 +405,16 @@ export default function KegiatanPage() {
                 <th className="px-6 py-3">Petugas</th>
                 <th className="px-6 py-3">Tanggal & Tempat</th>
                 <th className="px-6 py-3">Uraian</th>
+                <th className="px-6 py-3">Monitoring</th>
                 <th className="px-6 py-3">Cetak Dokumen</th>
                 <th className="px-6 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-sm text-slate-600">
               {loading ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 italic">Sinkronisasi data harian...</td></tr>
+                <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">Sinkronisasi data harian...</td></tr>
               ) : kegiatan.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 italic">Belum ada rekaman kegiatan.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">Belum ada rekaman kegiatan.</td></tr>
               ) : kegiatan.map((k) => (
                 <tr key={k.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
@@ -426,6 +431,14 @@ export default function KegiatanPage() {
                   </td>
                   <td className="px-6 py-4">
                     <p className="line-clamp-2 max-w-xs italic text-slate-500">"{k.uraian}"</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Input Oleh:</p>
+                      <p className="text-xs font-semibold text-indigo-600 truncate max-w-[120px]" title={k.createdByEmail}>
+                        {k.createdByNama?.split(' ')[0] || 'Sistem'}
+                      </p>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <button

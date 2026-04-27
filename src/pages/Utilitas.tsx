@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 import { 
@@ -16,13 +16,22 @@ import {
   FileText,
   Briefcase,
   X,
-  Upload
+  Upload,
+  ShieldAlert,
+  Users as UsersIcon,
+  Fingerprint,
+  Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { DEFAULT_LOGO } from '../constants';
+import { useUserRole } from '../hooks/useUserRole';
+import { auth } from '../lib/firebase';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
 
-type UtilityTab = 'umum' | 'sub_kegiatan' | 'biaya' | 'bbm' | 'bendahara';
+type UtilityTab = 'umum' | 'sub_kegiatan' | 'biaya' | 'bbm' | 'bendahara' | 'users';
 
 export default function UtilitasPage() {
   const [activeTab, setActiveTab] = useState<UtilityTab>('umum');
@@ -52,10 +61,38 @@ export default function UtilitasPage() {
   const [newBiaya, setNewBiaya] = useState({ tingkat: 'A', jenis: 'Dalam Daerah' as const, nominal: 0 });
   const [newBbm, setNewBbm] = useState({ jenis: '', harga: 0 });
   const [newManajemen, setNewManajemen] = useState({ nama: '', nip: '', pangkat: '', jabatan: '' });
+  const [users, setUsers] = useState<any[]>([]);
+  const [petugasMeta, setPetugasMeta] = useState<any[]>([]);
+  const [newUser, setNewUser] = useState({ 
+    username: '', 
+    password: '', 
+    phone: '', 
+    name: '', 
+    role: 'petugas' as 'admin' | 'petugas',
+    email: '', // for google login admin
+    petugasId: ''
+  });
+
+  const { role, loading: roleLoading } = useUserRole(auth.currentUser);
 
   useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+    if (role === 'admin') {
+      fetchData();
+    }
+  }, [activeTab, role]);
+
+  if (roleLoading) return null;
+  if (role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
+        <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mb-6">
+          <ShieldAlert size={40} />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Akses Dibatasi</h2>
+        <p className="text-slate-500 max-w-sm font-medium">Maaf, halaman utilitas dan pengaturan hanya dapat diakses oleh Administrator Sistem.</p>
+      </div>
+    );
+  }
 
   const fetchData = async () => {
     setLoading(true);
@@ -95,6 +132,13 @@ export default function UtilitasPage() {
       } else if (activeTab === 'bendahara') {
         const snap = await getDocs(collection(db, 'manajemen'));
         setManajemen(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+      } else if (activeTab === 'users') {
+        const [uSnap, pSnap] = await Promise.all([
+          getDocs(collection(db, 'users')),
+          getDocs(collection(db, 'petugas'))
+        ]);
+        setUsers(uSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+        setPetugasMeta(pSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
       }
     } catch (err) {
       console.error(err);
@@ -223,6 +267,101 @@ export default function UtilitasPage() {
     }
   };
 
+  const handleCreateUser = async () => {
+    setLoading(true);
+    try {
+      if (editingId) {
+        // Update Firestore doc only for simplicity (editing roles/meta)
+        // If password is provided, we can't easily change it here without current context
+        const updateData: any = {
+          name: newUser.name,
+          role: newUser.role,
+          phone: newUser.phone,
+          petugasId: newUser.petugasId,
+          updatedAt: new Date().toISOString()
+        };
+        
+        // If it's a manual petugas user, we might want to update username too
+        if (newUser.role === 'petugas') {
+          updateData.username = newUser.username;
+          updateData.email = `${newUser.username}@sikat.id`;
+        } else {
+          updateData.email = newUser.email;
+        }
+
+        await updateDoc(doc(db, 'users', editingId), updateData);
+        setEditingId(null);
+        setIsEditing(false);
+        setNewUser({ username: '', password: '', phone: '', name: '', role: 'petugas', email: '', petugasId: '' });
+        fetchData();
+        showSuccess('User berhasil diperbarui');
+        setLoading(false);
+        return;
+      }
+
+      let email = newUser.email;
+      let uid = '';
+
+      if (newUser.role === 'petugas') {
+        if (!newUser.username || !newUser.password) {
+          alert('Username dan Password wajib diisi untuk petugas.');
+          setLoading(false);
+          return;
+        }
+        email = `${newUser.username}@sikat.id`;
+        
+        // Create Firebase Auth user using secondary app hack
+        const secondaryApp = initializeApp(firebaseConfig, 'SecondaryRegistrationApp');
+        const secondaryAuth = getAuth(secondaryApp);
+        try {
+          const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, newUser.password);
+          uid = userCredential.user.uid;
+        } catch (err: any) {
+          if (err.code === 'auth/email-already-in-use') {
+             // Maybe document already exists but auth was deleted? Or just error.
+             alert('Username sudah terdaftar.');
+             await deleteApp(secondaryApp);
+             setLoading(false);
+             return;
+          }
+          throw err;
+        }
+        await deleteApp(secondaryApp);
+      } else {
+        if (!newUser.email) {
+          alert('Email (Google Account) wajib diisi untuk Admin.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      const userData = {
+        name: newUser.name,
+        role: newUser.role,
+        email: email,
+        phone: newUser.phone,
+        petugasId: newUser.petugasId,
+        username: newUser.username || '',
+        createdAt: new Date().toISOString()
+      };
+
+      if (uid) {
+        await setDoc(doc(db, 'users', uid), userData);
+      } else {
+        await addDoc(collection(db, 'users'), userData);
+      }
+
+      setNewUser({ username: '', password: '', phone: '', name: '', role: 'petugas', email: '', petugasId: '' });
+      fetchData();
+      showSuccess('User berhasil dibuat');
+    } catch (err: any) {
+      console.error(err);
+      alert('Gagal membuat user: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const startEdit = (tab: UtilityTab, item: any) => {
     setEditingId(item.id);
     setIsEditing(true);
@@ -234,6 +373,16 @@ export default function UtilitasPage() {
       setNewBbm({ jenis: item.jenis, harga: item.harga });
     } else if (tab === 'bendahara') {
       setNewManajemen({ nama: item.nama, nip: item.nip, pangkat: item.pangkat, jabatan: item.jabatan });
+    } else if (tab === 'users') {
+      setNewUser({ 
+        username: item.username || '', 
+        password: '', 
+        phone: item.phone || '', 
+        name: item.name || '', 
+        role: item.role || 'petugas',
+        email: item.email || '',
+        petugasId: item.petugasId || ''
+      });
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -245,6 +394,7 @@ export default function UtilitasPage() {
     setNewBiaya({ tingkat: 'A', jenis: 'Dalam Daerah', nominal: 0 });
     setNewBbm({ jenis: '', harga: 0 });
     setNewManajemen({ nama: '', nip: '', pangkat: '', jabatan: '' });
+    setNewUser({ username: '', password: '', phone: '', name: '', role: 'petugas', email: '', petugasId: '' });
   };
 
   const confirmDelete = (coll: string, id: string) => {
@@ -326,6 +476,7 @@ export default function UtilitasPage() {
     { id: 'biaya', name: 'Biaya Perjalanan', icon: Wallet },
     { id: 'bbm', name: 'Bahan Bakar', icon: Fuel },
     { id: 'bendahara', name: 'Bendahara Pembantu', icon: Briefcase },
+    { id: 'users', name: 'Manajemen User', icon: UsersIcon },
   ];
 
   return (
@@ -872,6 +1023,176 @@ export default function UtilitasPage() {
                               <Settings size={16} />
                             </button>
                             <button onClick={() => confirmDelete('manajemen', item.id!)} className="text-slate-300 hover:text-rose-600 p-1 transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'users' && (
+              <div className="p-8 space-y-8">
+                <div className={cn(
+                  "rounded-2xl p-6 border transition-all space-y-6",
+                  isEditing ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"
+                )}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Fingerprint size={16} className={isEditing ? "text-amber-600" : "text-indigo-600"} /> 
+                      {isEditing ? 'Edit Akun User' : 'Buat Akun Baru'}
+                    </h3>
+                    {isEditing && (
+                      <button onClick={cancelEdit} className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline">
+                        <X size={14} /> Batal
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nama Lengkap</label>
+                      <input 
+                        type="text" 
+                        placeholder="Nama Lengkap User" 
+                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm"
+                        value={newUser.name}
+                        onChange={e => setNewUser({...newUser, name: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Role Akses</label>
+                      <select 
+                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm"
+                        value={newUser.role}
+                        onChange={e => setNewUser({...newUser, role: e.target.value as any})}
+                      >
+                        <option value="petugas">Petugas Lapangan (Username/Pass)</option>
+                        <option value="admin">Administrator (Google Account)</option>
+                      </select>
+                    </div>
+
+                    {newUser.role === 'petugas' ? (
+                      <>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Username</label>
+                          <input 
+                            type="text" 
+                            placeholder="username_petugas" 
+                            className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm"
+                            value={newUser.username}
+                            onChange={e => setNewUser({...newUser, username: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            Password {isEditing && "(Kosongkan jika tidak ganti)"}
+                          </label>
+                          <input 
+                            type="password" 
+                            placeholder={isEditing ? "•••••••• (Password tidak bisa diubah di sini)" : "••••••••"}
+                            disabled={isEditing}
+                            className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                            value={newUser.password}
+                            onChange={e => setNewUser({...newUser, password: e.target.value})}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Google</label>
+                        <input 
+                          type="email" 
+                          placeholder="contoh@gmail.com" 
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm"
+                          value={newUser.email}
+                          onChange={e => setNewUser({...newUser, email: e.target.value})}
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nomor HP / WhatsApp</label>
+                      <div className="relative">
+                        <Phone size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                          type="tel" 
+                          placeholder="0812345..." 
+                          className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm"
+                          value={newUser.phone}
+                          onChange={e => setNewUser({...newUser, phone: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tautkan ke Data Petugas</label>
+                      <select 
+                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm"
+                        value={newUser.petugasId}
+                        onChange={e => setNewUser({...newUser, petugasId: e.target.value})}
+                      >
+                        <option value="">-- Tidak Ditautkan --</option>
+                        {petugasMeta.map(p => (
+                          <option key={p.id} value={p.id}>{p.nama}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleCreateUser}
+                    disabled={loading}
+                    className={cn(
+                      "w-full font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50 text-white",
+                      isEditing ? "bg-amber-600 hover:bg-amber-700 shadow-amber-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+                    )}
+                  >
+                    {isEditing ? <Save size={18} /> : <UserCheck size={18} />}
+                    {isEditing ? 'SIMPAN PERUBAHAN' : 'BUAT USER SEKARANG'}
+                  </button>
+                </div>
+
+                <div className="overflow-hidden border border-slate-100 rounded-xl">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-[10px] font-bold uppercase text-slate-400">User</th>
+                        <th className="px-6 py-3 text-left text-[10px] font-bold uppercase text-slate-400">Akses</th>
+                        <th className="px-6 py-3 text-left text-[10px] font-bold uppercase text-slate-400">Kontak</th>
+                        <th className="px-6 py-3 text-right text-[10px] font-bold uppercase text-slate-400">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {users.map(u => (
+                        <tr key={u.id} className="hover:bg-slate-50/50">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-slate-700">{u.name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{u.email || u.username}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                              u.role === 'admin' ? "bg-indigo-50 border-indigo-100 text-indigo-600" : "bg-emerald-50 border-emerald-100 text-emerald-600"
+                            )}>
+                              {u.role}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-xs font-medium text-slate-500">{u.phone || '-'}</td>
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                             <button
+                              onClick={() => startEdit('users', u)}
+                              className="text-slate-200 hover:text-indigo-600 p-2 transition-colors"
+                            >
+                              <Settings size={16} />
+                            </button>
+                             <button 
+                              onClick={() => confirmDelete('users', u.id)} 
+                              className="text-slate-200 hover:text-rose-600 p-2 transition-colors"
+                            >
                               <Trash2 size={16} />
                             </button>
                           </td>

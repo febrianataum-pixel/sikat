@@ -1,8 +1,10 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useUserRole } from '../hooks/useUserRole';
+import { auth } from '../lib/firebase';
 
 interface Petugas {
   id: string;
@@ -23,9 +25,26 @@ export default function PetugasPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const { role, loading: roleLoading } = useUserRole(auth.currentUser);
+
   useEffect(() => {
-    fetchPetugas();
-  }, []);
+    if (role === 'admin') {
+      fetchPetugas();
+    }
+  }, [role]);
+
+  if (roleLoading) return null;
+  if (role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
+        <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mb-6">
+          <ShieldAlert size={40} />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Akses Dibatasi</h2>
+        <p className="text-slate-500 max-w-sm font-medium">Maaf, halaman pengelolaan petugas hanya dapat diakses oleh Administrator Sistem.</p>
+      </div>
+    );
+  }
 
   const fetchPetugas = async () => {
     setLoading(true);

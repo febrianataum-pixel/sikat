@@ -41,8 +41,9 @@
       "type": "object",
       "properties": {
         "email": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "staff"] },
-        "name": { "type": "string" }
+        "role": { "type": "string", "enum": ["admin", "petugas"] },
+        "name": { "type": "string" },
+        "petugasId": { "type": "string", "description": "ID referensi ke entity Petugas jika rolenya petugas" }
       },
       "required": ["email", "role"]
     }

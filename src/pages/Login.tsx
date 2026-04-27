@@ -14,9 +14,13 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      let loginEmail = email;
+      if (!email.includes('@')) {
+        loginEmail = `${email.trim().toLowerCase()}@sikat.id`;
+      }
+      await signInWithEmailAndPassword(auth, loginEmail, password);
     } catch (err: any) {
-      setError('Email atau password salah.');
+      setError('Username/Email atau password salah.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -50,12 +54,12 @@ export default function Login() {
               </div>
             )}
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Email Institusi</label>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Username / Email Institusi</label>
               <input
-                type="email"
+                type="text"
                 required
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-                placeholder="admin@dinsos.go.id"
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-semibold"
+                placeholder="cth: budi_dinsos"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />

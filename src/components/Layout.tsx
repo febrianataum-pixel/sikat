@@ -15,24 +15,32 @@ import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { useUserRole } from '../hooks/useUserRole';
+import { UserCircle } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Data Petugas', href: '/petugas', icon: Users },
-  { name: 'Log Kegiatan', href: '/kegiatan', icon: Calendar },
-  { name: 'Arsip Laporan', href: '/laporan', icon: FileText },
-  { name: 'Utilitas & Pengaturan', href: '/utilitas', icon: Settings },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin', 'petugas'] },
+  { name: 'Data Petugas', href: '/petugas', icon: Users, roles: ['admin'] },
+  { name: 'Log Kegiatan', href: '/kegiatan', icon: Calendar, roles: ['admin', 'petugas'] },
+  { name: 'Arsip Laporan', href: '/laporan', icon: FileText, roles: ['admin'] },
+  { name: 'Utilitas & Pengaturan', href: '/utilitas', icon: Settings, roles: ['admin'] },
+  { name: 'Profil Saya', href: '/profile', icon: UserCircle, roles: ['admin', 'petugas'] },
 ];
 
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { role, userProfile, loading } = useUserRole(auth.currentUser);
 
   const handleLogout = async () => {
     await signOut(auth);
     navigate('/login');
   };
+
+  const filteredNav = navigation.filter(item => item.roles.includes(role || ''));
+
+  if (loading) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -61,7 +69,7 @@ export default function Layout() {
           </div>
 
           <nav className="flex-1 px-4 space-y-1 mt-4">
-            {navigation.map((item) => {
+            {filteredNav.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link
@@ -88,8 +96,8 @@ export default function Layout() {
                 {auth.currentUser?.email?.[0].toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-800 truncate">Administrator</p>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest">Dinas Sosial</p>
+                <p className="text-sm font-semibold text-slate-800 truncate">{userProfile?.name || 'User'}</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest">{role === 'admin' ? 'Administrator' : 'Petugas Lapangan'}</p>
               </div>
             </div>
             <button
@@ -116,7 +124,7 @@ export default function Layout() {
 
           <div className="flex-1 hidden sm:block">
             <h1 className="text-lg font-bold text-slate-800">
-              {navigation.find(n => n.href === location.pathname)?.name || 'Halaman'}
+              {filteredNav.find(n => n.href === location.pathname)?.name || 'Halaman'}
             </h1>
           </div>
 

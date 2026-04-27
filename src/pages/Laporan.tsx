@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Filter, Download, FileSpreadsheet, FileIcon as FilePdf, Check, X } from 'lucide-react';
+import { Filter, Download, FileSpreadsheet, FileIcon as FilePdf, Check, X, ShieldAlert } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
+import { useUserRole } from '../hooks/useUserRole';
+import { auth } from '../lib/firebase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -62,9 +64,26 @@ export default function LaporanPage() {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
 
+  const { role, loading: roleLoading } = useUserRole(auth.currentUser);
+
   useEffect(() => {
-    fetchInitialData();
-  }, []);
+    if (role === 'admin') {
+      fetchInitialData();
+    }
+  }, [role]);
+
+  if (roleLoading) return null;
+  if (role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
+        <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mb-6">
+          <ShieldAlert size={40} />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Akses Dibatasi</h2>
+        <p className="text-slate-500 max-w-sm font-medium">Maaf, halaman arsip laporan hanya dapat diakses oleh Administrator Sistem.</p>
+      </div>
+    );
+  }
 
   const fetchInitialData = async () => {
     const [pSnap, mSnap] = await Promise.all([

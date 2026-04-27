@@ -15,6 +15,8 @@ import PetugasPage from './pages/Petugas';
 import KegiatanPage from './pages/Kegiatan';
 import LaporanPage from './pages/Laporan';
 import UtilitasPage from './pages/Utilitas';
+import InputCepat from './pages/InputCepat';
+import ProfilePage from './pages/Profile';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -47,6 +49,8 @@ export default function App() {
           <Route path="/kegiatan" element={<KegiatanPage />} />
           <Route path="/utilitas" element={<UtilitasPage />} />
           <Route path="/laporan" element={<LaporanPage />} />
+          <Route path="/input" element={<InputCepat />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" />} />
