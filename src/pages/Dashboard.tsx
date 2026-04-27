@@ -67,7 +67,21 @@ export default function Dashboard() {
         const kegiatan = activitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kegiatan));
         
         setPetugasData(petugas);
-        setKegiatanData(kegiatan);
+        
+        let filteredKegiatan = kegiatan;
+        if (role === 'petugas') {
+          const currentUserEmail = auth.currentUser?.email;
+          const currentPetugasId = userProfile?.petugasId;
+          const currentUserName = userProfile?.name;
+
+          filteredKegiatan = kegiatan.filter(k => 
+            (currentPetugasId && k.petugasId === currentPetugasId) || 
+            (currentUserEmail && (k as any).createdByEmail === currentUserEmail) ||
+            (currentUserName && (k as any).petugasNama === currentUserName)
+          );
+        }
+        
+        setKegiatanData(filteredKegiatan);
 
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -75,7 +89,7 @@ export default function Dashboard() {
         let thisMonthCount = 0;
         let pendingLaporan = 0;
         
-        kegiatan.forEach(data => {
+        filteredKegiatan.forEach(data => {
           const d = new Date(data.tanggal);
           if (d >= startOfMonth) thisMonthCount++;
           if (!data.hasLaporan || !data.hasDokumentasi || !data.hasSppd) pendingLaporan++;
@@ -83,7 +97,7 @@ export default function Dashboard() {
 
         setStats({
           totalPetugas: petugas.length,
-          totalKegiatan: kegiatan.length,
+          totalKegiatan: filteredKegiatan.length,
           kegiatanBulanIni: thisMonthCount,
           laporanPending: pendingLaporan
         });
@@ -197,7 +211,7 @@ export default function Dashboard() {
           </div>
           
           <div className="space-y-4">
-            {kegiatanData.filter(k => k.petugasId === userProfile?.petugasId).slice(0, 5).map(act => (
+            {kegiatanData.slice(0, 5).map(act => (
               <div key={act.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex flex-col items-center justify-center text-[10px] font-bold text-slate-400 uppercase">
                   <span className="text-slate-800 text-sm">{act.tanggal.split('-')[2]}</span>
@@ -210,7 +224,7 @@ export default function Dashboard() {
                 <ChevronRight size={16} className="text-slate-300" />
               </div>
             ))}
-            {kegiatanData.filter(k => k.petugasId === userProfile?.petugasId).length === 0 && (
+            {kegiatanData.length === 0 && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
                   <ListTodo size={32} />

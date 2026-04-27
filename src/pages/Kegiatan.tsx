@@ -93,21 +93,11 @@ export default function KegiatanPage() {
     if (roleLoading || !role) return;
     setLoading(true);
     try {
+      // For petugas, we try to be as robust as possible. 
+      // If we use 'where', it might require composite indexes which fail if missing.
+      // We fetch all records (or reasonably large amount) and filter in memory to ensure data is seen.
       let kegiatanQuery = query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc'));
       
-      if (role === 'petugas' && userProfile?.petugasId) {
-        kegiatanQuery = query(
-          collection(db, 'kegiatan'), 
-          where('petugasId', '==', userProfile.petugasId),
-          orderBy('tanggal', 'desc')
-        );
-      } else if (role === 'petugas' && !userProfile?.petugasId) {
-        // If petugas but no linked ID, show nothing to be safe
-        setKegiatan([]);
-        setLoading(false);
-        return;
-      }
-
       const [pSnap, kSnap, sSnap, mSnap, subSnap, bSnap, bbmSnap] = await Promise.all([
         getDocs(collection(db, 'petugas')),
         getDocs(kegiatanQuery),
@@ -126,7 +116,21 @@ export default function KegiatanPage() {
         jenis: doc.data().jenis
       })));
 
-      setKegiatan(kSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kegiatan)));
+      let kData = kSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kegiatan));
+
+      if (role === 'petugas') {
+        const currentUserEmail = auth.currentUser?.email;
+        const currentPetugasId = userProfile?.petugasId;
+        const currentUserName = userProfile?.name;
+
+        kData = kData.filter(k => 
+          (currentPetugasId && k.petugasId === currentPetugasId) || 
+          (currentUserEmail && k.createdByEmail === currentUserEmail) ||
+          (currentUserName && k.petugasNama === currentUserName)
+        );
+      }
+
+      setKegiatan(kData);
 
       if (!sSnap.empty) {
         const data = sSnap.docs.find(d => d.id === 'general')?.data() || sSnap.docs[0].data();
