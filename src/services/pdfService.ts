@@ -174,29 +174,31 @@ export const generateSpt = (data: {
   currentY += 15;
 
   // SIGNATURE
-  doc.text('Ditetapkan di', 115, currentY);
-  doc.text(': Blora', 145, currentY);
+  const sigX = 115;
+  doc.setFont('helvetica', 'normal');
+  doc.text('Ditetapkan di', sigX, currentY);
+  doc.text(': Blora', sigX + 30, currentY);
   currentY += 5;
-  doc.text('Pada Tanggal', 115, currentY);
-  doc.text(`: ${formatDateWithDay(data.tanggal).split(',')[1].trim()}`, 145, currentY);
-  doc.line(115, currentY + 1, 185, currentY + 1);
+  doc.text('Tanggal', sigX, currentY);
+  doc.text(`: ${formatDateWithDay(data.tanggal).split(',')[1].trim()}`, sigX + 30, currentY);
+  doc.line(sigX, currentY + 1, sigX + 75, currentY + 1);
 
   currentY += 10;
   doc.setFont('helvetica', 'bold');
   const kadisLines = [
-    'KEPALA DINAS SOSIAL PEMBERDAYAAN',
-    'PEREMPUAN DAN PERLINDUNGAN ANAK',
-    'KABUPATEN BLORA'
+    'Kepala Dinas Sosial,',
+    'Pemberdayaan Perempuan dan',
+    'Perlindungan Anak',
+    'Kabupaten Blora'
   ];
   kadisLines.forEach((line, i) => {
-    doc.text(line, 150, currentY + (i * 5), { align: 'center' });
+    doc.text(line, sigX, currentY + (i * 5));
   });
 
   currentY += 35;
-  doc.text(data.kadis.nama, 150, currentY, { align: 'center' });
+  doc.text(data.kadis.nama, sigX, currentY);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.kadis.pangkat, 150, currentY + 5, { align: 'center' });
-  doc.text(`NIP : ${data.kadis.nip}`, 150, currentY + 10, { align: 'center' });
+  doc.text(`NIP. ${data.kadis.nip}`, sigX, currentY + 5);
 
   return doc;
 };
@@ -558,9 +560,9 @@ export const generateSppdDepan = (data: SppdData) => {
     theme: 'grid',
     head: [],
     body: [
-      ['1.', 'Pejabat Pembuat Komitmen', data.ppk.nama],
+      ['1.', 'Pejabat Pembuat Komitmen', { content: data.ppk.nama, styles: { fontStyle: 'bold' } }],
       ['2.', 'Pegawai yang melaksanakan perjalanan dinas', ''],
-      ['', 'a. Nama', data.petugas.nama],
+      ['', 'a. Nama', { content: data.petugas.nama, styles: { fontStyle: 'bold' } }],
       ['', 'b. NIAT', data.petugas.niat || '-'],
       ['', 'c. Jabatan', data.petugas.jabatan || '-'],
       ['', 'd. Tingkat biaya Perjalanan Dinas', data.petugas.tingkatSPPD],
@@ -593,14 +595,14 @@ export const generateSppdDepan = (data: SppdData) => {
 
   // PENGIKUT SUB-TABLE
   autoTable(doc, {
-    startY: tableStartY - 0.1, // Slight overlap for continuous border
+    startY: tableStartY,
     margin: { left: 23, right: 15 },
     theme: 'grid',
     head: [['No', 'Nama', 'NIP', 'Gol', 'Tingkat Biaya\nPerjalanan Dinas', 'Tanda\nTangan', 'Ket']],
     body: [
-      ['1', '', '', '0', '', '1', ''],
-      ['2', '', '', '0', '', '2', ''],
-      ['3', '', '', '0', '', '3', ''],
+      ['1', '', '', '-', '', '1', ''],
+      ['2', '', '', '-', '', '2', ''],
+      ['3', '', '', '-', '', '3', ''],
     ],
     headStyles: {
       fillColor: [255, 255, 255],
@@ -608,12 +610,13 @@ export const generateSppdDepan = (data: SppdData) => {
       fontSize: 8,
       halign: 'center',
       lineWidth: 0.1,
-      lineColor: [0, 0, 0]
+      lineColor: [0, 0, 0],
+      fontStyle: 'bold'
     },
     styles: {
       font: 'helvetica',
       fontSize: 8,
-      cellPadding: 1,
+      cellPadding: 1.5,
       lineColor: [0, 0, 0],
       lineWidth: 0.1,
       textColor: [0, 0, 0],
@@ -635,7 +638,7 @@ export const generateSppdDepan = (data: SppdData) => {
 
   // REMAINING TABLE POINTS
   autoTable(doc, {
-    startY: afterPengikutY - 0.1,
+    startY: afterPengikutY,
     margin: { left: 15, right: 15 },
     theme: 'grid',
     head: [],
