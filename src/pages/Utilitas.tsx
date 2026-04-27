@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -395,6 +396,19 @@ export default function UtilitasPage() {
     setNewBbm({ jenis: '', harga: 0 });
     setNewManajemen({ nama: '', nip: '', pangkat: '', jabatan: '' });
     setNewUser({ username: '', password: '', phone: '', name: '', role: 'petugas', email: '', petugasId: '' });
+  };
+
+  const downloadUsersExcel = () => {
+    const data = users.map((u, index) => ({
+      'No': index + 1,
+      'Nama Lengkap': u.name,
+      'Username': u.username || (u.email?.split('@')[0]) || '-',
+      'Password': '***'
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+    XLSX.writeFile(workbook, "Daftar_User_SIKAT.xlsx");
   };
 
   const confirmDelete = (coll: string, id: string) => {
@@ -1041,15 +1055,25 @@ export default function UtilitasPage() {
                   isEditing ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"
                 )}>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                      <Fingerprint size={16} className={isEditing ? "text-amber-600" : "text-indigo-600"} /> 
-                      {isEditing ? 'Edit Akun User' : 'Buat Akun Baru'}
-                    </h3>
-                    {isEditing && (
-                      <button onClick={cancelEdit} className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline">
-                        <X size={14} /> Batal
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <Fingerprint size={16} className={isEditing ? "text-amber-600" : "text-indigo-600"} /> 
+                        {isEditing ? 'Edit Akun User' : 'Buat Akun Baru'}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={downloadUsersExcel}
+                        className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all outline-none"
+                      >
+                        <FileText size={14} /> Download Excel
                       </button>
-                    )}
+                      {isEditing && (
+                        <button onClick={cancelEdit} className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline">
+                          <X size={14} /> Batal
+                        </button>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
