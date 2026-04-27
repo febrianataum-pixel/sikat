@@ -84,10 +84,10 @@ export default function KegiatanPage() {
   const { role, userProfile, loading: roleLoading } = useUserRole(auth.currentUser);
 
   useEffect(() => {
-    if (role) {
+    if (!roleLoading && role) {
       fetchData();
     }
-  }, [role]);
+  }, [role, roleLoading, userProfile]);
 
   const fetchData = async () => {
     if (roleLoading || !role) return;
@@ -101,6 +101,11 @@ export default function KegiatanPage() {
           where('petugasId', '==', userProfile.petugasId),
           orderBy('tanggal', 'desc')
         );
+      } else if (role === 'petugas' && !userProfile?.petugasId) {
+        // If petugas but no linked ID, show nothing to be safe
+        setKegiatan([]);
+        setLoading(false);
+        return;
       }
 
       const [pSnap, kSnap, sSnap, mSnap, subSnap, bSnap, bbmSnap] = await Promise.all([
