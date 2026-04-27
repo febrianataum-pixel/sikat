@@ -636,6 +636,10 @@ export const generateSppdDepan = (data: SppdData) => {
 
   const afterPengikutY = (doc as any).lastAutoTable.finalY;
 
+  // Draw vertical line on the left to close the gap at x=15
+  doc.setLineWidth(0.1);
+  doc.line(15, tableStartY, 15, afterPengikutY);
+
   // REMAINING TABLE POINTS
   autoTable(doc, {
     startY: afterPengikutY,
