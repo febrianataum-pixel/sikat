@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth } from '../lib/firebase';
 import { 
@@ -13,12 +13,14 @@ import {
   AlertCircle,
   ChevronDown,
   Search,
-  Download
+  Download,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate, cn } from '../lib/utils';
 import { generateSppdDepan, generateSpt, generateRincianBiaya } from '../services/pdfService';
 import { DEFAULT_LOGO } from '../constants';
+import { useUserRole } from '../hooks/useUserRole';
 
 interface Petugas {
   id: string;
@@ -79,16 +81,31 @@ export default function KegiatanPage() {
   const [biayaPerjalanan, setBiayaPerjalanan] = useState<{ id: string, tingkat: string, jenis: string, nominal: number }[]>([]);
   const [bbm, setBbm] = useState<{ id: string, jenis: string, harga: number }[]>([]);
 
+  const { role, userProfile, loading: roleLoading } = useUserRole(auth.currentUser);
+
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (role) {
+      fetchData();
+    }
+  }, [role]);
 
   const fetchData = async () => {
+    if (roleLoading || !role) return;
     setLoading(true);
     try {
+      let kegiatanQuery = query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc'));
+      
+      if (role === 'petugas' && userProfile?.petugasId) {
+        kegiatanQuery = query(
+          collection(db, 'kegiatan'), 
+          where('petugasId', '==', userProfile.petugasId),
+          orderBy('tanggal', 'desc')
+        );
+      }
+
       const [pSnap, kSnap, sSnap, mSnap, subSnap, bSnap, bbmSnap] = await Promise.all([
         getDocs(collection(db, 'petugas')),
-        getDocs(query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc'))),
+        getDocs(kegiatanQuery),
         getDocs(collection(db, 'settings')),
         getDocs(collection(db, 'manajemen')),
         getDocs(collection(db, 'sub_kegiatan')),
@@ -383,10 +400,12 @@ export default function KegiatanPage() {
         <h2 className="text-xl font-bold tracking-tight text-slate-800">Log Kegiatan Harian</h2>
         <button
           onClick={() => {
+            const defaultPetugasId = (role === 'petugas' && userProfile?.petugasId) ? userProfile.petugasId : '';
             setCurrentKegiatan({ 
               tanggal: new Date().toISOString().split('T')[0], 
               laporanSelesai: false,
-              tahun: new Date().getFullYear().toString()
+              tahun: new Date().getFullYear().toString(),
+              petugasId: defaultPetugasId
             });
             setIsModalOpen(true);
           }}
@@ -511,19 +530,20 @@ export default function KegiatanPage() {
                     <div className="relative">
                       <button
                         type="button"
+                        disabled={role === 'petugas'}
                         onClick={() => setIsPetugasDropdownOpen(!isPetugasDropdownOpen)}
-                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm text-left flex items-center justify-between"
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm text-left flex items-center justify-between disabled:bg-slate-100 disabled:text-slate-500"
                       >
                         <span className={currentKegiatan?.petugasId ? "text-slate-800 font-medium" : "text-slate-400 font-normal"}>
                           {currentKegiatan?.petugasId 
                             ? petugas.find(p => p.id === currentKegiatan.petugasId)?.nama 
                             : '-- Pilih Anggota --'}
                         </span>
-                        <ChevronDown size={16} className={cn("text-slate-400 transition-transform", isPetugasDropdownOpen && "rotate-180")} />
+                        {role !== 'petugas' && <ChevronDown size={16} className={cn("text-slate-400 transition-transform", isPetugasDropdownOpen && "rotate-180")} />}
                       </button>
 
                       <AnimatePresence>
-                        {isPetugasDropdownOpen && (
+                        {isPetugasDropdownOpen && role !== 'petugas' && (
                           <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
