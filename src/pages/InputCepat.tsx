@@ -13,12 +13,16 @@ import {
   ChevronDown,
   FileText,
   Plus,
-  X
+  X,
+  Image as ImageIcon,
+  Loader2,
+  Camera
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../hooks/useUserRole';
+import imageCompression from 'browser-image-compression';
 
 interface Petugas {
   id: string;
@@ -48,8 +52,15 @@ export default function InputCepat() {
     subKegiatanId: '',
     lamaPerjalanan: 1,
     jenisWilayah: 'Dalam Daerah' as 'Luar Daerah' | 'Dalam Daerah',
-    hasilPerjalanan: ['']
+    hasilPerjalanan: [''],
+    dokumentasi: [] as string[],
+    hasLaporan: false,
+    hasDokumentasi: false,
+    hasSppd: false
   });
+
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -104,6 +115,33 @@ export default function InputCepat() {
     setFormData({ ...formData, hasilPerjalanan: newHasil });
   };
 
+  const handleUploadBase64 = async (file: File, onProgress?: (p: string) => void) => {
+    if (!file.type.startsWith('image/')) {
+      throw new Error(`File ${file.name} bukan gambar.`);
+    }
+
+    try {
+      if (onProgress) onProgress(`Proses...`);
+      const options = {
+        maxSizeMB: 0.15,
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
+        maxIteration: 10
+      };
+      const compressedFile = await imageCompression(file, options);
+      if (onProgress) onProgress(`Konversi...`);
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(compressedFile);
+      });
+    } catch (error: any) {
+      console.error("[Upload] ERROR:", error);
+      throw new Error(error.message || "Gagal memproses foto.");
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.petugasId || !formData.tempat || !formData.uraian || !formData.subKegiatanId) {
@@ -118,17 +156,14 @@ export default function InputCepat() {
       await addDoc(collection(db, 'kegiatan'), {
         ...formData,
         petugasNama: pNama,
-        hasLaporan: false,
-        hasDokumentasi: false,
-        hasSppd: false,
-        laporanSelesai: false,
+        laporanSelesai: !!(formData.hasLaporan && formData.hasDokumentasi && formData.hasSppd),
         nomor: '',
         nomorUrut: '',
         tahun: new Date().getFullYear().toString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         createdByEmail: auth.currentUser?.email || 'N/A',
-        createdByNama: auth.currentUser?.displayName || 'N/A'
+        createdByNama: userProfile?.name || auth.currentUser?.displayName || 'User'
       });
 
       setSuccess(true);
@@ -391,6 +426,128 @@ export default function InputCepat() {
                     </div>
                   </motion.div>
                 ))}
+              </div>
+            </div>
+
+            {/* Upload Foto Section */}
+            <div className="space-y-4 pt-4 border-t border-slate-50">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-2 uppercase tracking-tight">
+                  <Camera size={16} className="text-indigo-500" /> Dokumentasi Foto
+                </label>
+                <label className={cn(
+                  "cursor-pointer px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[10px] font-bold flex items-center gap-1.5 hover:bg-emerald-700 transition-all active:scale-95 shadow-lg",
+                  photoUploading && "opacity-50 pointer-events-none"
+                )}>
+                  {photoUploading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={14} />}
+                  {photoUploading ? uploadProgress : 'Tambah Foto'}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const files = e.target.files;
+                      if (!files?.length) return;
+                      setPhotoUploading(true);
+                      try {
+                        const newBase64s: string[] = [];
+                        const fileArray = Array.from(files as FileList);
+                        for (let i = 0; i < fileArray.length; i++) {
+                          const base64 = await handleUploadBase64(fileArray[i] as File, (p) => setUploadProgress(`[${i+1}/${fileArray.length}] ${p}`));
+                          if (base64) newBase64s.push(base64);
+                        }
+                        if (newBase64s.length > 0) {
+                          const updatedDocs = [...formData.dokumentasi, ...newBase64s];
+                          if (JSON.stringify(updatedDocs).length > 850000) {
+                             alert("Ukuran total foto terlalu besar. Silakan kurangi jumlah foto.");
+                             return;
+                          }
+                          setFormData({ 
+                            ...formData, 
+                            dokumentasi: updatedDocs,
+                            hasDokumentasi: true
+                          });
+                        }
+                      } catch (err: any) {
+                        alert(err.message || "Gagal proses foto");
+                      } finally {
+                        setPhotoUploading(false);
+                        setUploadProgress('');
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+
+              {formData.dokumentasi.length > 0 ? (
+                <div className="grid grid-cols-4 gap-2">
+                  {formData.dokumentasi.map((url, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 group shadow-sm bg-slate-50">
+                      <img src={url} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newDocs = formData.dokumentasi.filter((_, i) => i !== idx);
+                          setFormData({ ...formData, dokumentasi: newDocs });
+                        }}
+                        className="absolute inset-0 bg-rose-500/80 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-10 bg-slate-50 border border-dashed border-slate-100 rounded-3xl flex flex-col items-center justify-center text-slate-300 gap-2">
+                  <ImageIcon size={32} strokeWidth={1} />
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Belum Ada Foto</p>
+                </div>
+              )}
+            </div>
+
+            {/* Verifikasi Kelengkapan */}
+            <div className="space-y-4 pt-4 border-t border-slate-50">
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Verifikasi Kelengkapan (Ceklis)</label>
+              <div className="grid grid-cols-1 gap-3">
+                <label className={cn(
+                  "flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer",
+                  formData.hasLaporan ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
+                )}>
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    checked={formData.hasLaporan}
+                    onChange={(e) => setFormData({ ...formData, hasLaporan: e.target.checked })}
+                  />
+                  <span className="text-xs font-bold uppercase tracking-wide">Laporan Keluar</span>
+                </label>
+
+                <label className={cn(
+                  "flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer",
+                  formData.hasDokumentasi ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
+                )}>
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    checked={formData.hasDokumentasi}
+                    onChange={(e) => setFormData({ ...formData, hasDokumentasi: e.target.checked })}
+                  />
+                  <span className="text-xs font-bold uppercase tracking-wide">Dokumentasi Foto</span>
+                </label>
+
+                <label className={cn(
+                  "flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer",
+                  formData.hasSppd ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
+                )}>
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    checked={formData.hasSppd}
+                    onChange={(e) => setFormData({ ...formData, hasSppd: e.target.checked })}
+                  />
+                  <span className="text-xs font-bold uppercase tracking-wide">SPPD Belakang</span>
+                </label>
               </div>
             </div>
 

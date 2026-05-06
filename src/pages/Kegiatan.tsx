@@ -73,8 +73,6 @@ export default function KegiatanPage() {
   const [isPetugasDropdownOpen, setIsPetugasDropdownOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [selectedKegiatanForDownload, setSelectedKegiatanForDownload] = useState<Kegiatan | null>(null);
-  const [isManagePhotoModalOpen, setIsManagePhotoModalOpen] = useState(false);
-  const [selectedKegiatanForPhoto, setSelectedKegiatanForPhoto] = useState<Kegiatan | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -216,7 +214,7 @@ export default function KegiatanPage() {
           ...data,
           createdAt: new Date().toISOString(),
           createdByEmail: auth.currentUser?.email || 'N/A',
-          createdByNama: auth.currentUser?.displayName || 'N/A'
+          createdByNama: userProfile?.name || auth.currentUser?.displayName || 'User'
         });
       }
 
@@ -609,8 +607,8 @@ export default function KegiatanPage() {
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Input Oleh:</p>
-                      <p className="text-xs font-semibold text-indigo-600 truncate max-w-[120px]" title={k.createdByEmail}>
-                        {k.createdByNama?.split(' ')[0] || 'Sistem'}
+                      <p className="text-xs font-semibold text-slate-700 truncate max-w-[120px]" title={k.createdByEmail}>
+                        {(k.createdByNama && k.createdByNama !== 'N/A') ? k.createdByNama.split(' ')[0] : (k.createdByEmail?.split('@')[0] || 'Sistem')}
                       </p>
                     </div>
                   </td>
@@ -627,16 +625,6 @@ export default function KegiatanPage() {
                     </button>
                   </td>
                   <td className="px-6 py-4 text-right space-x-1">
-                    <button
-                      onClick={() => {
-                        setSelectedKegiatanForPhoto(k);
-                        setIsManagePhotoModalOpen(true);
-                      }}
-                      title="Kelola Foto Dokumentasi"
-                      className="p-1.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                    >
-                      <ImageIcon size={16} />
-                    </button>
                     <button
                       onClick={() => {
                         setCurrentKegiatan(k);
@@ -918,7 +906,111 @@ export default function KegiatanPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                {/* Upload Foto Section */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dokumentasi Foto</label>
+                      <p className="text-[9px] text-slate-400 italic">Maksimal 850KB total untuk semua foto</p>
+                    </div>
+                    <label className={cn(
+                      "cursor-pointer px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-2 transition-all shadow-sm",
+                      photoUploading ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
+                    )}>
+                      {photoUploading ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Plus size={12} />
+                      )}
+                      {photoUploading ? (uploadProgress || 'Proses...') : 'Tambah Foto'}
+                      <input 
+                        type="file" 
+                        multiple 
+                        accept="image/*" 
+                        className="hidden" 
+                        disabled={photoUploading}
+                        onChange={async (e) => {
+                          const files = e.target.files;
+                          if (!files?.length) return;
+                          
+                          setPhotoUploading(true);
+                          try {
+                            const newBase64s: string[] = [];
+                            const fileArray = Array.from(files as FileList);
+                            const total = fileArray.length;
+                            
+                            for (let i = 0; i < fileArray.length; i++) {
+                              const base64 = await handleUploadBase64(
+                                fileArray[i] as File, 
+                                (p) => setUploadProgress(`[${i + 1}/${total}] ${p}`)
+                              );
+                              if (base64) newBase64s.push(base64);
+                            }
+                            
+                            if (newBase64s.length > 0) {
+                              const currentDocs = currentKegiatan?.dokumentasi || [];
+                              const updatedDocs = [...currentDocs, ...newBase64s];
+                              
+                              // Check size
+                              const estimatedSize = JSON.stringify(updatedDocs).length;
+                              if (estimatedSize > 850000) {
+                                alert("Ukuran total foto terlalu besar. Silakan kurangi jumlah foto.");
+                                return;
+                              }
+
+                              setCurrentKegiatan({ 
+                                ...currentKegiatan, 
+                                dokumentasi: updatedDocs,
+                                hasDokumentasi: true 
+                              });
+                            }
+                          } catch (error: any) {
+                            alert(error.message || "Gagal memproses foto.");
+                          } finally {
+                            setPhotoUploading(false);
+                            setUploadProgress('');
+                            e.target.value = '';
+                          }
+                        }} 
+                      />
+                    </label>
+                  </div>
+
+                  {(currentKegiatan?.dokumentasi && currentKegiatan.dokumentasi.length > 0) ? (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {currentKegiatan.dokumentasi.map((url, index) => (
+                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100 group bg-slate-50">
+                          <img 
+                            src={url} 
+                            alt={`Doc ${index + 1}`} 
+                            className="w-full h-full object-cover" 
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newDocs = currentKegiatan.dokumentasi!.filter((_, i) => i !== index);
+                              setCurrentKegiatan({ 
+                                ...currentKegiatan, 
+                                dokumentasi: newDocs, 
+                                hasDokumentasi: (newDocs?.length || 0) > 0 
+                              });
+                            }}
+                            className="absolute inset-0 bg-rose-500/80 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-6 bg-slate-50 border border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-300 gap-1">
+                      <ImageIcon size={20} strokeWidth={1} />
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Belum Ada Foto</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-slate-100">
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Verifikasi Kelengkapan (Ceklis)</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className={cn(
@@ -1148,190 +1240,6 @@ export default function KegiatanPage() {
                   className="w-full h-full rounded-lg shadow-inner bg-white"
                   title="PDF Preview"
                 />
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isManagePhotoModalOpen && selectedKegiatanForPhoto && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => {
-                if (!photoUploading) setIsManagePhotoModalOpen(false);
-              }}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 50, scale: 0.95 }}
-              className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]"
-            >
-              <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white sticky top-0 z-10">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-                    <ImageIcon size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800">Dokumentasi Kegiatan</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedKegiatanForPhoto.tempat}</p>
-                  </div>
-                </div>
-                <button 
-                  disabled={photoUploading}
-                  onClick={() => setIsManagePhotoModalOpen(false)}
-                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors disabled:opacity-50"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="p-6 overflow-y-auto flex-1">
-                <div className="mb-6 flex items-center justify-between">
-                  <p className="text-xs font-medium text-slate-500">
-                    Daftar foto dokumentasi untuk kegiatan petugas <span className="font-bold text-slate-800">{selectedKegiatanForPhoto.petugasNama}</span>
-                  </p>
-                  
-                  <label className={cn(
-                    "cursor-pointer px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm",
-                    photoUploading ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
-                  )}>
-                    {photoUploading ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Plus size={16} />
-                    )}
-                    {photoUploading ? (uploadProgress || 'Memproses...') : 'Tambah Foto'}
-                    <input 
-                      type="file" 
-                      multiple 
-                      accept="image/*" 
-                      className="hidden" 
-                      disabled={photoUploading}
-                      onChange={async (e) => {
-                        const files = e.target.files;
-                        if (!files?.length) return;
-                        
-                        setPhotoUploading(true);
-                        try {
-                          const newBase64s: string[] = [];
-                          const fileArray = Array.from(files as FileList);
-                          const total = fileArray.length;
-                          
-                          for (let i = 0; i < fileArray.length; i++) {
-                            const base64 = await handleUploadBase64(
-                              fileArray[i] as File, 
-                              (p) => setUploadProgress(`[${i + 1}/${total}] ${p}`)
-                            );
-                            if (base64) newBase64s.push(base64);
-                          }
-                          
-                          if (newBase64s.length > 0) {
-                            const currentDocs = selectedKegiatanForPhoto.dokumentasi || [];
-                            const updatedDocs = [...currentDocs, ...newBase64s];
-                            
-                            // Check size before saving
-                            const estimatedSize = JSON.stringify(updatedDocs).length;
-                            if (estimatedSize > 850000) { // Limit to ~850KB for photos to avoid 1MB document limit
-                              alert("Batas ukuran file kegiatan tercapai. Hapus beberapa foto sebelum menambah yang baru.");
-                              return;
-                            }
-
-                            const kegiatanRef = doc(db, 'kegiatan', selectedKegiatanForPhoto.id);
-                            await updateDoc(kegiatanRef, {
-                              dokumentasi: updatedDocs,
-                              hasDokumentasi: true,
-                              updatedAt: new Date().toISOString()
-                            });
-                            
-                            // Update local state
-                            setKegiatan(prev => prev.map(k => 
-                              k.id === selectedKegiatanForPhoto.id 
-                                ? { ...k, dokumentasi: updatedDocs, hasDokumentasi: true } 
-                                : k
-                            ));
-                            setSelectedKegiatanForPhoto((prev: any) => ({
-                              ...prev,
-                              dokumentasi: updatedDocs,
-                              hasDokumentasi: true
-                            }));
-                          }
-                        } catch (error: any) {
-                          console.error("Upload error:", error);
-                          alert(error.message || "Gagal memproses foto.");
-                        } finally {
-                          setPhotoUploading(false);
-                          setUploadProgress('');
-                          e.target.value = '';
-                        }
-                      }} 
-                    />
-                  </label>
-                </div>
-
-                {((selectedKegiatanForPhoto.dokumentasi || []).length > 0) ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {selectedKegiatanForPhoto.dokumentasi!.map((url: string, index: number) => (
-                      <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 group bg-slate-50 shadow-sm">
-                        <img 
-                          src={url} 
-                          alt={`Doc ${index + 1}`} 
-                          className="w-full h-full object-cover" 
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (window.confirm('Hapus foto ini?')) {
-                                const newDocs = selectedKegiatanForPhoto.dokumentasi!.filter((_: any, i: number) => i !== index);
-                                const kegiatanRef = doc(db, 'kegiatan', selectedKegiatanForPhoto.id);
-                                await updateDoc(kegiatanRef, {
-                                  dokumentasi: newDocs,
-                                  hasDokumentasi: newDocs.length > 0,
-                                  updatedAt: new Date().toISOString()
-                                });
-                                
-                                setKegiatan(prev => prev.map(k => 
-                                  k.id === selectedKegiatanForPhoto.id 
-                                    ? { ...k, dokumentasi: newDocs, hasDokumentasi: newDocs.length > 0 } 
-                                    : k
-                                ));
-                                setSelectedKegiatanForPhoto((prev: any) => ({
-                                  ...prev,
-                                  dokumentasi: newDocs,
-                                  hasDokumentasi: newDocs.length > 0
-                                }));
-                              }
-                            }}
-                            className="p-2 bg-rose-500 text-white rounded-full hover:bg-rose-600 transition-colors shadow-lg"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-20 bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-3xl flex flex-col items-center justify-center text-slate-400 gap-4 text-center">
-                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-300">
-                      <ImageIcon size={32} strokeWidth={1.5} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Belum ada foto</p>
-                      <p className="text-xs text-slate-400 mt-1">Gunakan tombol 'Tambah Foto' untuk mulai mengunggah</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-4 bg-slate-50/50 border-t border-slate-50 text-center">
-                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Dokumentasi Digital • SIKAT</span>
               </div>
             </motion.div>
           </div>
