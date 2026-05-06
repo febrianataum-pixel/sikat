@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate, cn } from '../lib/utils';
-import { generateSppdDepan, generateSpt, generateRincianBiaya } from '../services/pdfService';
+import { generateSppdDepan, generateSpt, generateRincianBiaya, generateLaporanHasilPerjalanan } from '../services/pdfService';
 import { DEFAULT_LOGO } from '../constants';
 import { useUserRole } from '../hooks/useUserRole';
 
@@ -76,7 +76,7 @@ export default function KegiatanPage() {
   const [selectedKegiatanForDownload, setSelectedKegiatanForDownload] = useState<Kegiatan | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewType, setPreviewType] = useState<'sppd' | 'spt' | 'biaya'>('sppd');
+  const [previewType, setPreviewType] = useState<'sppd' | 'spt' | 'biaya' | 'hasil'>('sppd');
   const [settings, setSettings] = useState<{ logoUrl: string, dasarHukum: string[] } | null>(null);
   const [manajemen, setManajemen] = useState<{ id: string, nama: string, nip: string, jabatan: string }[]>([]);
   const [subKegiatan, setSubKegiatan] = useState<SubKegiatan[]>([]);
@@ -328,12 +328,25 @@ export default function KegiatanPage() {
         }
       });
       doc.save(`RINCIAN_${k.petugasNama}_${k.tanggal}.pdf`);
+    } else if (label === 'hasil') {
+      doc = generateLaporanHasilPerjalanan({
+        nomorSpt: k.nomor,
+        tahun: k.tahun,
+        tanggalSpt: k.tanggal,
+        maksud: k.uraian,
+        tempat: k.tempat,
+        petugas: { nama: k.petugasNama },
+        hasil: k.hasilPerjalanan || [],
+        dokumentasi: k.dokumentasi || [],
+        logoUrl: settings?.logoUrl
+      });
+      doc.save(`HASIL_LAPORAN_${k.petugasNama}_${k.tanggal}.pdf`);
     } else {
       alert(`Sedang menyiapkan dokumen: ${label}`);
     }
   };
 
-  const handlePreviewDoc = (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya') => {
+  const handlePreviewDoc = (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil') => {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return;
 
@@ -345,6 +358,7 @@ export default function KegiatanPage() {
       setPreviewType('sppd');
       doc = generateSppdDepan({
         nomorSppd: k.nomor,
+        tahun: k.tahun,
         petugas: {
           nama: k.petugasNama,
           niat: (p as any).niat || '-',
@@ -368,6 +382,7 @@ export default function KegiatanPage() {
       const kadisOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA DINAS')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Kepala Dinas' };
       doc = generateSpt({
         nomorSpt: k.nomor,
+        tahun: k.tahun,
         dasarHukum: settings?.dasarHukum || [],
         petugas: {
           nama: k.petugasNama,
@@ -391,6 +406,7 @@ export default function KegiatanPage() {
 
       doc = generateRincianBiaya({
         nomorSppd: k.nomor,
+        tahun: k.tahun,
         tanggalSpt: k.tanggal,
         petugas: {
           nama: k.petugasNama,
@@ -405,6 +421,19 @@ export default function KegiatanPage() {
           nama: bendaharaOfficial.nama,
           nip: bendaharaOfficial.nip
         }
+      });
+    } else if (type === 'hasil') {
+      setPreviewType('hasil');
+      doc = generateLaporanHasilPerjalanan({
+        nomorSpt: k.nomor,
+        tahun: k.tahun,
+        tanggalSpt: k.tanggal,
+        maksud: k.uraian,
+        tempat: k.tempat,
+        petugas: { nama: k.petugasNama },
+        hasil: k.hasilPerjalanan || [],
+        dokumentasi: k.dokumentasi || [],
+        logoUrl: settings?.logoUrl
       });
     }
 
@@ -1002,6 +1031,7 @@ export default function KegiatanPage() {
                     { title: 'SPPD Depan', desc: 'Halaman depan Surat Perjalanan Dinas', icon: FileIcon, label: 'sppd_depan' },
                     { title: 'Surat Perintah Tugas (SPT)', desc: 'Surat perintah penugasan resmi', icon: FileIcon, label: 'spt' },
                     { title: 'Rincian Biaya', desc: 'Rincian estimasi atau realisasi pengeluaran', icon: FileIcon, label: 'biaya' },
+                    { title: 'Laporan Hasil', desc: 'Laporan hasil pelaksanaan perjalanan dinas', icon: FileIcon, label: 'hasil' },
                   ].map((doc, i) => (
                     <button
                       key={i}
@@ -1071,6 +1101,15 @@ export default function KegiatanPage() {
                     )}
                   >
                     Biaya
+                  </button>
+                  <button
+                    onClick={() => handlePreviewDoc(selectedKegiatanForDownload, 'hasil')}
+                    className={cn(
+                      "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
+                      previewType === 'hasil' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    )}
+                  >
+                    Hasil
                   </button>
                 </div>
                 <div className="flex items-center gap-4">

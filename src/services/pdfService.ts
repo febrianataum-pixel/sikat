@@ -499,6 +499,194 @@ export const generateRekapKegiatan = (data: {
   return doc;
 };
 
+export const generateLaporanHasilPerjalanan = (data: {
+  nomorSpt?: string;
+  tahun?: string;
+  tanggalSpt: string;
+  maksud: string;
+  tempat: string;
+  petugas: {
+    nama: string;
+  };
+  hasil: string[];
+  dokumentasi?: string[];
+  logoUrl?: string;
+}) => {
+  const doc = new jsPDF({
+    orientation: 'p',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const formatDateShort = (dateStr: string) => {
+    const dateArr = dateStr.split('-');
+    if (dateArr.length !== 3) return dateStr;
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    return `${dateArr[2]} ${months[parseInt(dateArr[1]) - 1]} ${dateArr[0]}`;
+  };
+
+  // LOGO
+  if (data.logoUrl) {
+    try {
+      doc.addImage(data.logoUrl, undefined as any, 15, 12, 22, 22, undefined, 'FAST');
+    } catch (e) {
+      console.error("Failed to add logo:", e);
+    }
+  }
+
+  // KOP SURAT
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('PEMERINTAH KABUPATEN BLORA', 105, 15, { align: 'center' });
+  doc.setFontSize(14);
+  doc.text('DINAS SOSIAL PEMBERDAYAAN PEREMPUAN', 105, 21, { align: 'center' });
+  doc.text('DAN PERLINDUNGAN ANAK', 105, 27, { align: 'center' });
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Jl. Pemuda No.16 A Telp / Fax (0296) 5298541 BLORA – 58215', 105, 32, { align: 'center' });
+  doc.text('Website : dinsos.blorakab.go.id / E-mail : dinsosp3a.bla.com', 105, 36, { align: 'center' });
+
+  // LINE
+  doc.setLineWidth(0.8);
+  doc.line(15, 40, 195, 40);
+  doc.setLineWidth(0.3);
+  doc.line(15, 41, 195, 41);
+
+  // JUDUL
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('LAPORAN HASIL PERJALANAN', 105, 50, { align: 'center' });
+  const textWidth = doc.getTextWidth('LAPORAN HASIL PERJALANAN');
+  doc.line(105 - textWidth/2, 51, 105 + textWidth/2, 51);
+
+  let currentY = 65;
+  doc.setFontSize(10);
+
+  // 1. UMUM
+  doc.setFont('helvetica', 'bold');
+  doc.text('1.  UMUM', 15, currentY);
+  currentY += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.text('Maksud dan tujuan perjalanan Dinas', 22, currentY);
+  doc.text(':', 95, currentY);
+  const maksudLines = doc.splitTextToSize(data.maksud, 95);
+  doc.text(maksudLines, 100, currentY);
+  currentY += (maksudLines.length * 5) + 2;
+
+  doc.text('Tanggal dan Nomor Surat Perintah Tugas', 22, currentY);
+  doc.text(':', 95, currentY);
+  
+  const currentYear = data.tahun || data.tanggalSpt.split('-')[0] || new Date().getFullYear();
+  let fullNomor = data.nomorSpt || '...............';
+  if (fullNomor && fullNomor !== '...............' && !fullNomor.includes('000.1.2.3')) {
+    fullNomor = `000.1.2.3 / ${fullNomor} / ${currentYear}`;
+  }
+  
+  doc.text(formatDateShort(data.tanggalSpt), 100, currentY);
+  currentY += 5;
+  doc.text(`Nomor : ${fullNomor}`, 100, currentY);
+  currentY += 7;
+
+  doc.text('Tempat Tujuan', 22, currentY);
+  doc.text(':', 95, currentY);
+  const tempatLines = doc.splitTextToSize(data.tempat, 95);
+  doc.text(tempatLines, 100, currentY);
+  currentY += (tempatLines.length * 5) + 5;
+
+  // 2. HASIL YANG DIPEROLEH
+  doc.setFont('helvetica', 'bold');
+  doc.text('2.  HASIL YANG DIPEROLEH', 15, currentY);
+  currentY += 6;
+  doc.setFont('helvetica', 'normal');
+  
+  if (data.hasil && data.hasil.length > 0) {
+    data.hasil.filter(h => h.trim() !== '').forEach((h) => {
+      doc.text('\u2022', 22, currentY);
+      const lines = doc.splitTextToSize(h, 165);
+      doc.text(lines, 27, currentY);
+      currentY += (lines.length * 5) + 2;
+    });
+  } else {
+    doc.text('\u2022', 22, currentY);
+    doc.text('-', 27, currentY);
+    currentY += 7;
+  }
+  currentY += 3;
+
+  // 3. LAIN-LAIN
+  doc.setFont('helvetica', 'bold');
+  doc.text('3.  LAIN-LAIN', 15, currentY);
+  currentY += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.text('\u2022  Dokumentasi kegiatan terlampir,', 22, currentY);
+  currentY += 5;
+  doc.text('\u2022  Selama kegiatan berlangsung lancar.', 22, currentY);
+  currentY += 5;
+  doc.text('\u2022  Demikian untuk menjadi periksa dan mohon petunjuk.', 22, currentY);
+
+  currentY += 20;
+
+  // SIGNATURE
+  doc.text(`Blora, ${formatDateShort(data.tanggalSpt)}`, 130, currentY);
+  currentY += 5;
+  doc.text('Yang menjalankan tugas :', 130, currentY);
+  currentY += 10;
+  
+  doc.text(`1.  ${data.petugas.nama}`, 130, currentY);
+  doc.text('........................', 175, currentY);
+  currentY += 10;
+  doc.text('2.  ........................', 130, currentY);
+  doc.text('........................', 175, currentY);
+  currentY += 10;
+  doc.text('3.  ........................', 130, currentY);
+  doc.text('........................', 175, currentY);
+  currentY += 10;
+
+  // DOKUMENTASI PAGE
+  if (data.dokumentasi && data.dokumentasi.length > 0) {
+    doc.addPage();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('LAMPIRAN DOKUMENTASI KEGIATAN', 105, 20, { align: 'center' });
+    
+    // Kop reference
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Kegiatan : ${data.maksud}`, 15, 30);
+    doc.text(`Tempat   : ${data.tempat}`, 15, 35);
+    doc.text(`Tanggal  : ${formatDateShort(data.tanggalSpt)}`, 15, 40);
+
+    let photoY = 50;
+    let photoX = 15;
+    const photoWidth = 85;
+    const photoHeight = 60;
+
+    data.dokumentasi.forEach((url, i) => {
+      if (photoY + photoHeight > 280) {
+        doc.addPage();
+        photoY = 20;
+      }
+
+      try {
+        doc.addImage(url, 'JPEG', photoX, photoY, photoWidth, photoHeight, undefined, 'FAST');
+      } catch (e) {
+        doc.rect(photoX, photoY, photoWidth, photoHeight);
+        doc.text('Gagal memuat gambar', photoX + 5, photoY + photoHeight / 2);
+      }
+
+      if (i % 2 === 0) {
+        photoX = 110;
+      } else {
+        photoX = 15;
+        photoY += photoHeight + 10;
+      }
+    });
+  }
+
+  return doc;
+};
+
 export const generateSppdDepan = (data: SppdData) => {
   const doc = new jsPDF({
     orientation: 'p',
