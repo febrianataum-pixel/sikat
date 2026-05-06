@@ -177,7 +177,7 @@ export default function KegiatanPage() {
     }
   };
 
-  const handleUpload = async (file: File, path: string) => {
+  const handleUpload = async (file: File, path: string, onProgress?: (p: string) => void) => {
     // Validasi file
     if (!file.type.startsWith('image/')) {
       throw new Error(`File ${file.name} bukan gambar.`);
@@ -185,23 +185,46 @@ export default function KegiatanPage() {
 
     try {
       // Kompresi Gambar
-      setUploadProgress(`Mengompresi ${file.name}...`);
-      const options = {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1280,
-        useWebWorker: true,
-      };
-      const compressedFile = await imageCompression(file, options);
+      console.log("Starting compression for:", file.name);
+      let fileToUpload: File | Blob = file;
+      try {
+        if (onProgress) onProgress(`Kompresi ${file.name}...`);
+        const options = {
+          maxSizeMB: 0.8,
+          maxWidthOrHeight: 1280,
+          useWebWorker: false,
+        };
+        try {
+          fileToUpload = await imageCompression(file, options);
+          console.log("Compression success:", file.name, "Original:", file.size, "Compressed:", fileToUpload.size);
+        } catch (err) {
+          console.warn("Compression failed, using original:", err);
+        }
+      } catch (err) {
+        console.warn("Outer compression try block failed:", err);
+      }
 
-      setUploadProgress(`Mengunggah ${file.name}...`);
       const timestamp = Date.now();
-      const uid = auth.currentUser?.uid || 'anon';
+      const user = auth.currentUser;
+      if (!user) {
+        console.error("User not authenticated for storage upload");
+        throw new Error("Sesi berakhir. Silakan login kembali.");
+      }
+      
+      const uid = user.uid;
       const storageRef = ref(storage, `${path}/${uid}_${timestamp}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, compressedFile);
-      return getDownloadURL(snapshot.ref);
-    } catch (error) {
-      console.error("Compression/Upload error:", error);
-      throw error;
+      
+      console.log("Uploading to:", storageRef.fullPath);
+      if (onProgress) onProgress(`Mengunggah ${file.name}...`);
+      
+      const snapshot = await uploadBytes(storageRef, fileToUpload);
+      const url = await getDownloadURL(snapshot.ref);
+      
+      console.log("Upload finished:", url);
+      return url;
+    } catch (error: any) {
+      console.error("Critical Upload Error:", error);
+      throw new Error(`Gagal mengunggah ${file.name}: ${error.code || error.message || 'Cek koneksi'}`);
     }
   };
 
@@ -909,7 +932,9 @@ export default function KegiatanPage() {
                 {/* Dokumentasi */}
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dokumentasi</label>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                      <ImageIcon size={14} className="text-indigo-500" /> Dokumentasi Kegiatan
+                    </label>
                     <label className={cn(
                       "cursor-pointer px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all font-sans",
                       photoUploading ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
@@ -934,26 +959,41 @@ export default function KegiatanPage() {
                           setPhotoUploading(true);
                           setUploadProgress('Menyiapkan...');
                           try {
-                            const urls: string[] = [];
+                            const newUrls: string[] = [];
                             const fileArray = Array.from(files as FileList);
                             
                             for (let i = 0; i < fileArray.length; i++) {
-                              setUploadProgress(`File ${i + 1}/${fileArray.length}...`);
-                              const url = await handleUpload(fileArray[i] as File, 'kegiatan');
-                              urls.push(url);
+                              const total = fileArray.length;
+                              try {
+                                const url = await handleUpload(
+                                  fileArray[i] as File, 
+                                  'kegiatan',
+                                  (p) => setUploadProgress(`[${i + 1}/${total}] ${p}`)
+                                );
+                                if (url) newUrls.push(url);
+                              } catch (err) {
+                                console.error("Single upload failed:", err);
+                              }
                             }
                             
-                            setCurrentKegiatan(prev => prev ? ({
-                              ...prev,
-                              hasDokumentasi: true,
-                              dokumentasi: [...(prev.dokumentasi || []), ...urls]
-                            }) : null);
+                            if (newUrls.length > 0) {
+                              setCurrentKegiatan(prev => {
+                                if (!prev) return null;
+                                const existing = Array.isArray(prev.dokumentasi) ? prev.dokumentasi : [];
+                                return {
+                                  ...prev,
+                                  hasDokumentasi: true,
+                                  dokumentasi: [...existing, ...newUrls]
+                                };
+                              });
+                            }
                           } catch (error: any) {
                             console.error("Upload error:", error);
-                            alert(error.message || "Gagal mengupload foto. Pastikan koneksi stabil.");
+                            alert("Terjadi kesalahan saat mengunggah foto.");
                           } finally {
                             setPhotoUploading(false);
                             setUploadProgress('');
+                            e.target.value = '';
                           }
                         }} 
                       />
@@ -963,15 +1003,24 @@ export default function KegiatanPage() {
                   {((currentKegiatan?.dokumentasi || []).length > 0) ? (
                     <div className="grid grid-cols-4 gap-2">
                       {currentKegiatan?.dokumentasi?.map((url, index) => (
-                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100 group">
-                          <img src={url} alt="Doc" className="w-full h-full object-cover" />
+                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100 group bg-slate-50">
+                          <img 
+                            src={url} 
+                            alt="Doc" 
+                            className="w-full h-full object-cover" 
+                            referrerPolicy="no-referrer"
+                          />
                           <button
                             type="button"
                             onClick={() => {
                               const newDocs = currentKegiatan?.dokumentasi?.filter((_, i) => i !== index);
-                              setCurrentKegiatan({ ...currentKegiatan, dokumentasi: newDocs, hasDokumentasi: (newDocs?.length || 0) > 0 });
+                              setCurrentKegiatan({ 
+                                ...currentKegiatan, 
+                                dokumentasi: newDocs, 
+                                hasDokumentasi: (newDocs?.length || 0) > 0 
+                              });
                             }}
-                            className="absolute inset-0 bg-rose-500/80 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            className="absolute inset-0 bg-rose-500/80 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -979,9 +1028,9 @@ export default function KegiatanPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="py-8 bg-slate-50 border-2 border-dashed border-slate-100 rounded-lg flex flex-col items-center justify-center text-slate-400 gap-2">
-                      <ImageIcon size={24} />
-                      <p className="text-[10px] font-medium uppercase tracking-widest">Belum ada foto</p>
+                    <div className="py-8 bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-xl flex flex-col items-center justify-center text-slate-400 gap-2">
+                      <ImageIcon size={24} strokeWidth={1.5} />
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300">Belum ada foto kegiatan</p>
                     </div>
                   )}
                 </div>

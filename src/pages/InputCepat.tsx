@@ -125,28 +125,48 @@ export default function InputCepat() {
       
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
+        const total = fileArray.length;
         
         // Validasi file
         if (!file.type.startsWith('image/')) {
-          throw new Error(`File ${file.name} bukan gambar.`);
+          console.error(`File ${file.name} is not an image`);
+          continue;
         }
 
         // Kompresi Gambar
-        setUploadProgress(`Kompres ${i + 1}/${fileArray.length}...`);
+        setUploadProgress(`[${i + 1}/${total}] Kompresi...`);
+        console.log("Compressing file:", file.name);
         const options = {
-          maxSizeMB: 1,
+          maxSizeMB: 0.8,
           maxWidthOrHeight: 1280,
-          useWebWorker: true,
+          useWebWorker: false, 
         };
-        const compressedFile = await imageCompression(file, options);
+        
+        let fileToUpload: File | Blob = file;
+        try {
+          fileToUpload = await imageCompression(file, options);
+          console.log("Compression done for:", file.name);
+        } catch (compErr) {
+          console.error("Compression skipped, using original:", compErr);
+        }
 
-        setUploadProgress(`Unggah ${i + 1}/${fileArray.length}...`);
         const timestamp = Date.now();
-        const uid = auth.currentUser?.uid || 'anon';
+        const user = auth.currentUser;
+        if (!user) {
+          throw new Error("Sesi berakhir. Silakan login kembali.");
+        }
+        
+        const uid = user.uid;
         const storageRef = ref(storage, `kegiatan/${uid}_${timestamp}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, compressedFile);
+        
+        console.log("Uploading to:", storageRef.fullPath);
+        setUploadProgress(`[${i + 1}/${total}] Mengunggah...`);
+        
+        const snapshot = await uploadBytes(storageRef, fileToUpload);
         const url = await getDownloadURL(snapshot.ref);
+        
         urls.push(url);
+        console.log("File uploaded successfully:", url);
       }
 
       setFormData(prev => ({
@@ -487,7 +507,7 @@ export default function InputCepat() {
                   ) : (
                     <ImageIcon size={32} strokeWidth={1.5} />
                   )}
-                  <p className="text-xs font-medium">Belum ada dokumentasi ditambahkan</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300 text-center">Belum ada dokumentasi</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -496,21 +516,29 @@ export default function InputCepat() {
                       key={index}
                       initial={{ scale: 0.9, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="relative aspect-square rounded-2xl overflow-hidden group border border-slate-100"
+                      className="relative aspect-square rounded-2xl overflow-hidden group border border-slate-100 bg-slate-50 shadow-sm"
                     >
-                      <img src={url} alt={`Doc ${index + 1}`} className="w-full h-full object-cover" />
+                      <img 
+                        src={url} 
+                        alt={`Doc ${index + 1}`} 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer"
+                      />
                       <button
                         type="button"
                         onClick={() => removePhoto(index)}
-                        className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Trash2 size={16} />
                       </button>
                     </motion.div>
                   ))}
                   {uploading && (
-                    <div className="aspect-square rounded-2xl bg-slate-50 flex items-center justify-center">
-                      <Loader2 size={24} className="animate-spin text-indigo-500" />
+                    <div className="aspect-square rounded-2xl bg-slate-50 flex items-center justify-center border-2 border-dashed border-slate-100 animate-pulse">
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 size={24} className="animate-spin text-indigo-500" />
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{uploadProgress}</span>
+                      </div>
                     </div>
                   )}
                 </div>
