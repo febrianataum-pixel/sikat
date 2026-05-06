@@ -763,7 +763,7 @@ export default function KegiatanPage() {
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Balai Desa Karanganyar"
+                    placeholder="Contoh : Desa Kamolan, Kec. Blora"
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     value={currentKegiatan?.tempat || ''}
                     onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, tempat: e.target.value })}
@@ -775,7 +775,7 @@ export default function KegiatanPage() {
                   <textarea
                     required
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all h-24 resize-none italic"
-                    placeholder="Uraikan detail tugas yang dilaksanakan hari ini..."
+                    placeholder="Isikan Maksud dan Tujuan perjalanan"
                     value={currentKegiatan?.uraian || ''}
                     onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, uraian: e.target.value })}
                   />

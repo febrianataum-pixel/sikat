@@ -285,7 +285,7 @@ export default function InputCepat() {
               <input
                 type="text"
                 required
-                placeholder="Contoh: Balai Desa Sidoasri"
+                placeholder="Contoh : Desa Kamolan, Kec. Blora"
                 className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800"
                 value={formData.tempat}
                 onChange={(e) => setFormData({ ...formData, tempat: e.target.value })}
@@ -299,7 +299,7 @@ export default function InputCepat() {
               </label>
               <textarea
                 required
-                placeholder="Tuliskan detail kegiatan hari ini..."
+                placeholder="Isikan Maksud dan Tujuan perjalanan"
                 className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-700 min-h-[120px] resize-none"
                 value={formData.uraian}
                 onChange={(e) => setFormData({ ...formData, uraian: e.target.value })}
