@@ -233,7 +233,7 @@ export default function KegiatanPage() {
         laporanSelesai: isComplete,
         hasilPerjalanan: currentKegiatan.hasilPerjalanan || [],
         dokumentasi: currentKegiatan.dokumentasi || [],
-        jenisWilayah: currentKegiatan.jenisWilayah || 'Luar Daerah',
+        jenisWilayah: currentKegiatan.jenisWilayah || 'Dalam Daerah',
         biayaTransport: currentKegiatan.biayaTransport || 0,
         updatedAt: new Date().toISOString()
       };
@@ -262,7 +262,7 @@ export default function KegiatanPage() {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return null;
 
-    const jenis = k.jenisWilayah || 'Luar Daerah';
+    const jenis = k.jenisWilayah || 'Dalam Daerah';
     const tingkat = (p as any).tingkatSPPD || 'Non ASN';
     
     // Find daily allowance
@@ -795,7 +795,7 @@ export default function KegiatanPage() {
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Wilayah Tugas *</label>
                     <select
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-bold"
-                      value={currentKegiatan?.jenisWilayah || 'Luar Daerah'}
+                      value={currentKegiatan?.jenisWilayah || 'Dalam Daerah'}
                       onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, jenisWilayah: e.target.value as any })}
                     >
                       <option value="Luar Daerah">Luar Daerah</option>

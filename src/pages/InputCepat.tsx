@@ -55,6 +55,7 @@ export default function InputCepat() {
     uraian: '',
     subKegiatanId: '',
     lamaPerjalanan: 1,
+    jenisWilayah: 'Dalam Daerah' as 'Luar Daerah' | 'Dalam Daerah',
     hasilPerjalanan: [''],
     dokumentasi: [] as string[]
   });
@@ -318,7 +319,7 @@ export default function InputCepat() {
               </div>
             </div>
 
-            {/* Tanggal & Lama */}
+            {/* Tanggal & Lama & Wilayah */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -332,18 +333,33 @@ export default function InputCepat() {
                   onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <AlignLeft size={14} className="text-indigo-500" /> Lama (Hari)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800"
-                  value={formData.lamaPerjalanan}
-                  onChange={(e) => setFormData({ ...formData, lamaPerjalanan: Number(e.target.value) })}
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <AlignLeft size={14} className="text-indigo-500" /> Lama
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={formData.lamaPerjalanan}
+                    onChange={(e) => setFormData({ ...formData, lamaPerjalanan: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <MapPin size={14} className="text-indigo-500" /> Wilayah
+                  </label>
+                  <select
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={formData.jenisWilayah}
+                    onChange={(e) => setFormData({ ...formData, jenisWilayah: e.target.value as any })}
+                  >
+                    <option value="Dalam Daerah">Dalam</option>
+                    <option value="Luar Daerah">Luar</option>
+                  </select>
+                </div>
               </div>
             </div>
 
