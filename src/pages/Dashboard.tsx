@@ -54,6 +54,7 @@ export default function Dashboard() {
   const [petugasData, setPetugasData] = useState<Petugas[]>([]);
   const [kegiatanData, setKegiatanData] = useState<Kegiatan[]>([]);
   const [selectedPetugas, setSelectedPetugas] = useState<Petugas | null>(null);
+  const [selectedStat, setSelectedStat] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -124,9 +125,21 @@ export default function Dashboard() {
   }, [petugasData, kegiatanData]);
 
   const selectedActivities = useMemo(() => {
+    if (selectedStat) {
+      if (selectedStat === 'Total Petugas') return []; // Special case
+      if (selectedStat === 'Total Kegiatan') return kegiatanData;
+      if (selectedStat === 'Kegiatan Bulan Ini') {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return kegiatanData.filter(k => new Date(k.tanggal) >= startOfMonth);
+      }
+      if (selectedStat === 'Laporan Pending') {
+        return kegiatanData.filter(k => !k.hasLaporan || !k.hasDokumentasi || !k.hasSppd);
+      }
+    }
     if (!selectedPetugas) return [];
     return kegiatanData.filter(k => k.petugasId === selectedPetugas.id);
-  }, [selectedPetugas, kegiatanData]);
+  }, [selectedPetugas, selectedStat, kegiatanData]);
 
   const statCards = [
     { label: 'Total Petugas', value: stats.totalPetugas, icon: Users, color: 'text-indigo-600' },
@@ -137,8 +150,14 @@ export default function Dashboard() {
 
   const handleBarClick = (data: any) => {
     if (data && data.fullData) {
+      setSelectedStat(null);
       setSelectedPetugas(data.fullData);
     }
+  };
+
+  const handleStatClick = (label: string) => {
+    setSelectedPetugas(null);
+    setSelectedStat(label);
   };
 
   if (loading || roleLoading) return null;
@@ -246,13 +265,22 @@ export default function Dashboard() {
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
       >
         {statCards.map((card) => (
-          <div key={card.label} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <motion.div 
+            key={card.label} 
+            whileHover={{ y: -4, scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => handleStatClick(card.label)}
+            className={cn(
+              "p-5 rounded-3xl border shadow-sm cursor-pointer transition-all",
+              selectedStat === card.label ? "bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500/20" : "bg-white border-slate-200"
+            )}
+          >
             <p className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <card.icon size={16} className={card.color} />
               {card.label}
             </p>
             <h3 className={`text-3xl font-bold mt-1 ${card.color}`}>{card.value}</h3>
-          </div>
+          </motion.div>
         ))}
       </motion.div>
 
@@ -323,10 +351,10 @@ export default function Dashboard() {
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-hidden flex flex-col relative"
+          className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 overflow-hidden flex flex-col relative"
         >
           <AnimatePresence mode="wait">
-            {!selectedPetugas ? (
+            {!selectedPetugas && !selectedStat ? (
               <motion.div 
                 key="empty"
                 initial={{ opacity: 0 }}
@@ -390,44 +418,90 @@ export default function Dashboard() {
               >
                 <div className="flex items-center justify-between mb-6">
                   <button 
-                    onClick={() => setSelectedPetugas(null)}
+                    onClick={() => {
+                      setSelectedPetugas(null);
+                      setSelectedStat(null);
+                    }}
                     className="p-1.5 hover:bg-slate-100 rounded-full transition-colors"
                   >
                     <ArrowLeft size={18} className="text-slate-500" />
                   </button>
-                  <h3 className="font-bold text-slate-800 text-sm truncate max-w-[150px]">{selectedPetugas.nama}</h3>
+                  <h3 className="font-bold text-slate-800 text-sm truncate max-w-[150px]">
+                    {selectedStat || selectedPetugas?.nama}
+                  </h3>
                   <div className="w-8"></div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Kegiatan ({selectedActivities.length})</h4>
-                  <div className="space-y-3">
-                    {selectedActivities.slice(0, 10).map((act) => (
-                      <div key={act.id} className="p-3 bg-slate-50 rounded-lg border border-slate-100 group hover:border-indigo-200 transition-all">
-                        <div className="flex justify-between items-start gap-2">
-                          <p className="text-xs font-bold text-slate-800 leading-tight">{act.uraian}</p>
-                          <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">{formatDate(act.tanggal)}</span>
+                  {selectedStat === 'Total Petugas' ? (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Daftar Petugas ({petugasData.length})</h4>
+                      {petugasData.map(p => (
+                        <div 
+                          key={p.id} 
+                          onClick={() => {
+                            setSelectedStat(null);
+                            setSelectedPetugas(p);
+                          }}
+                          className="p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-indigo-200 transition-all cursor-pointer flex items-center gap-3"
+                        >
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
+                            <Users size={16} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">{p.nama}</p>
+                            {p.niat && <p className="text-[10px] text-slate-500">{p.niat}</p>}
+                          </div>
                         </div>
-                        <div className="mt-2 flex items-center justify-between">
-                          <p className="text-[10px] text-slate-500">{act.tempat}</p>
-                          <div className={cn(
-                            "w-2 h-2 rounded-full",
-                            act.hasLaporan && act.hasDokumentasi && act.hasSppd ? "bg-emerald-500" : "bg-orange-500"
-                          )}></div>
-                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Kegiatan ({selectedActivities.length})</h4>
+                      <div className="space-y-3">
+                        {selectedActivities.slice(0, 20).map((act) => (
+                          <div 
+                            key={act.id} 
+                            onClick={() => navigate('/kegiatan')}
+                            className="p-3 bg-slate-50 rounded-xl border border-slate-100 group hover:border-indigo-200 transition-all cursor-pointer"
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <p className="text-xs font-bold text-slate-800 leading-tight">{act.uraian}</p>
+                              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">{formatDate(act.tanggal)}</span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between">
+                              <p className="text-[10px] text-slate-500">{act.tempat}</p>
+                              <div className={cn(
+                                "w-2 h-2 rounded-full",
+                                act.hasLaporan && act.hasDokumentasi && act.hasSppd ? "bg-emerald-500" : "bg-orange-500"
+                              )}></div>
+                            </div>
+                          </div>
+                        ))}
+                        {selectedActivities.length > 20 && (
+                          <button 
+                            onClick={() => navigate('/kegiatan')}
+                            className="w-full py-2 text-[10px] font-bold text-indigo-600 uppercase tracking-widest"
+                          >
+                            Lihat {selectedActivities.length - 20} lainnya...
+                          </button>
+                        )}
+                        {selectedActivities.length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-xs text-slate-400 italic">Belum ada data kegiatan</p>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                    {selectedActivities.length === 0 && (
-                      <div className="text-center py-8">
-                        <p className="text-xs text-slate-400 italic">Belum ada data kegiatan</p>
-                      </div>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
 
                 <button 
-                  onClick={() => setSelectedPetugas(null)}
-                  className="mt-4 w-full py-2 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  onClick={() => {
+                    setSelectedPetugas(null);
+                    setSelectedStat(null);
+                  }}
+                  className="mt-4 w-full py-2 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                   <X size={14} /> TUTUP DETAIL
                 </button>

@@ -574,7 +574,7 @@ export default function KegiatanPage() {
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
               <tr>
-                <th className="px-6 py-3">Petugas</th>
+                <th className="px-6 py-3">Petugas & Status</th>
                 <th className="px-6 py-3">Tanggal & Tempat</th>
                 <th className="px-6 py-3">Uraian</th>
                 <th className="px-6 py-3">Monitoring</th>
@@ -590,12 +590,20 @@ export default function KegiatanPage() {
               ) : filteredKegiatanList.map((k) => (
                 <tr key={k.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
-                    <button
-                      onClick={() => handlePreviewDoc(k, 'sppd')}
-                      className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors text-left"
-                    >
-                      {k.petugasNama}
-                    </button>
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => handlePreviewDoc(k, 'sppd')}
+                        className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors text-left"
+                      >
+                        {k.petugasNama}
+                      </button>
+                      {!k.laporanSelesai && (
+                        <span className="text-[9px] font-bold text-rose-500 uppercase tracking-tighter mt-0.5 bg-rose-50 px-1.5 py-0.5 rounded-full w-fit">Belum Terverifikasi</span>
+                      )}
+                      {k.laporanSelesai && (
+                        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-tighter mt-0.5 bg-emerald-50 px-1.5 py-0.5 rounded-full w-fit">Terverifikasi</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <p className="font-medium text-slate-700">{formatDate(k.tanggal)}</p>
@@ -1010,49 +1018,51 @@ export default function KegiatanPage() {
                   )}
                 </div>
 
-                <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Verifikasi Kelengkapan (Ceklis)</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
-                      currentKegiatan?.hasLaporan ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
-                    )}>
-                      <input
-                        type="checkbox"
-                        className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                        checked={currentKegiatan?.hasLaporan || false}
-                        onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, hasLaporan: e.target.checked })}
-                      />
-                      <span className="text-xs font-bold uppercase tracking-wide">Laporan</span>
-                    </label>
+                {role === 'admin' && (
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Verifikasi Kelengkapan (Ceklis)</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
+                        currentKegiatan?.hasLaporan ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
+                      )}>
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          checked={currentKegiatan?.hasLaporan || false}
+                          onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, hasLaporan: e.target.checked })}
+                        />
+                        <span className="text-xs font-bold uppercase tracking-wide">Laporan</span>
+                      </label>
 
-                    <label className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
-                      currentKegiatan?.hasDokumentasi ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
-                    )}>
-                      <input
-                        type="checkbox"
-                        className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                        checked={currentKegiatan?.hasDokumentasi || false}
-                        onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, hasDokumentasi: e.target.checked })}
-                      />
-                      <span className="text-xs font-bold uppercase tracking-wide">Dokumentasi</span>
-                    </label>
+                      <label className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
+                        currentKegiatan?.hasDokumentasi ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
+                      )}>
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          checked={currentKegiatan?.hasDokumentasi || false}
+                          onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, hasDokumentasi: e.target.checked })}
+                        />
+                        <span className="text-xs font-bold uppercase tracking-wide">Dokumentasi</span>
+                      </label>
 
-                    <label className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
-                      currentKegiatan?.hasSppd ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
-                    )}>
-                      <input
-                        type="checkbox"
-                        className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                        checked={currentKegiatan?.hasSppd || false}
-                        onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, hasSppd: e.target.checked })}
-                      />
-                      <span className="text-xs font-bold uppercase tracking-wide">SPPD Belakang</span>
-                    </label>
+                      <label className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
+                        currentKegiatan?.hasSppd ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
+                      )}>
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          checked={currentKegiatan?.hasSppd || false}
+                          onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, hasSppd: e.target.checked })}
+                        />
+                        <span className="text-xs font-bold uppercase tracking-wide">SPPD Belakang</span>
+                      </label>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="pt-4 flex gap-3">
                   <button

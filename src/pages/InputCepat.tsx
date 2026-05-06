@@ -53,10 +53,7 @@ export default function InputCepat() {
     lamaPerjalanan: 1,
     jenisWilayah: 'Dalam Daerah' as 'Luar Daerah' | 'Dalam Daerah',
     hasilPerjalanan: [''],
-    dokumentasi: [] as string[],
-    hasLaporan: false,
-    hasDokumentasi: false,
-    hasSppd: false
+    dokumentasi: [] as string[]
   });
 
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -156,7 +153,10 @@ export default function InputCepat() {
       await addDoc(collection(db, 'kegiatan'), {
         ...formData,
         petugasNama: pNama,
-        laporanSelesai: !!(formData.hasLaporan && formData.hasDokumentasi && formData.hasSppd),
+        hasLaporan: false,
+        hasDokumentasi: formData.dokumentasi.length > 0,
+        hasSppd: false,
+        laporanSelesai: false,
         nomor: '',
         nomorUrut: '',
         tahun: new Date().getFullYear().toString(),
@@ -465,8 +465,7 @@ export default function InputCepat() {
                           }
                           setFormData({ 
                             ...formData, 
-                            dokumentasi: updatedDocs,
-                            hasDokumentasi: true
+                            dokumentasi: updatedDocs
                           });
                         }
                       } catch (err: any) {
@@ -504,51 +503,6 @@ export default function InputCepat() {
                   <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Belum Ada Foto</p>
                 </div>
               )}
-            </div>
-
-            {/* Verifikasi Kelengkapan */}
-            <div className="space-y-4 pt-4 border-t border-slate-50">
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Verifikasi Kelengkapan (Ceklis)</label>
-              <div className="grid grid-cols-1 gap-3">
-                <label className={cn(
-                  "flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer",
-                  formData.hasLaporan ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
-                )}>
-                  <input
-                    type="checkbox"
-                    className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                    checked={formData.hasLaporan}
-                    onChange={(e) => setFormData({ ...formData, hasLaporan: e.target.checked })}
-                  />
-                  <span className="text-xs font-bold uppercase tracking-wide">Laporan</span>
-                </label>
-
-                <label className={cn(
-                  "flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer",
-                  formData.hasDokumentasi ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
-                )}>
-                  <input
-                    type="checkbox"
-                    className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                    checked={formData.hasDokumentasi}
-                    onChange={(e) => setFormData({ ...formData, hasDokumentasi: e.target.checked })}
-                  />
-                  <span className="text-xs font-bold uppercase tracking-wide">Dokumentasi Foto</span>
-                </label>
-
-                <label className={cn(
-                  "flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer",
-                  formData.hasSppd ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
-                )}>
-                  <input
-                    type="checkbox"
-                    className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                    checked={formData.hasSppd}
-                    onChange={(e) => setFormData({ ...formData, hasSppd: e.target.checked })}
-                  />
-                  <span className="text-xs font-bold uppercase tracking-wide">SPPD Belakang</span>
-                </label>
-              </div>
             </div>
 
             {/* Submit Button */}
