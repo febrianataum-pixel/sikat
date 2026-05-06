@@ -631,17 +631,12 @@ export const generateLaporanHasilPerjalanan = (data: {
   doc.text(`Blora, ${formatDateShort(data.tanggalSpt)}`, 130, currentY);
   currentY += 5;
   doc.text('Yang menjalankan tugas :', 130, currentY);
-  currentY += 10;
+  currentY += 15;
   
-  doc.text(`1.  ${data.petugas.nama}`, 130, currentY);
-  doc.text('........................', 175, currentY);
-  currentY += 10;
-  doc.text('2.  ........................', 130, currentY);
-  doc.text('........................', 175, currentY);
-  currentY += 10;
-  doc.text('3.  ........................', 130, currentY);
-  doc.text('........................', 175, currentY);
-  currentY += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.text(data.petugas.nama, 130, currentY);
+  const nameWidth = doc.getTextWidth(data.petugas.nama);
+  doc.line(130, currentY + 1, 130 + nameWidth, currentY + 1);
 
   return doc;
 };
