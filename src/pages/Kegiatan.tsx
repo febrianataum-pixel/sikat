@@ -66,6 +66,7 @@ export default function KegiatanPage() {
   const [kegiatan, setKegiatan] = useState<Kegiatan[]>([]);
   const [petugas, setPetugas] = useState<Petugas[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentKegiatan, setCurrentKegiatan] = useState<Partial<Kegiatan> | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -174,7 +175,17 @@ export default function KegiatanPage() {
   };
 
   const handleUpload = async (file: File, path: string) => {
-    const storageRef = ref(storage, `${path}/${Date.now()}_${file.name}`);
+    // Validasi file
+    if (!file.type.startsWith('image/')) {
+      throw new Error(`File ${file.name} bukan gambar.`);
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error(`File ${file.name} terlalu besar (maksimal 10MB).`);
+    }
+
+    const timestamp = Date.now();
+    const uid = auth.currentUser?.uid || 'anon';
+    const storageRef = ref(storage, `${path}/${uid}_${timestamp}_${file.name}`);
     const snapshot = await uploadBytes(storageRef, file);
     return getDownloadURL(snapshot.ref);
   };
@@ -884,27 +895,43 @@ export default function KegiatanPage() {
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dokumentasi</label>
-                    <label className="cursor-pointer px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-bold flex items-center gap-1 hover:bg-emerald-100 transition-all font-sans">
-                      <Plus size={12} /> Tambah Foto
+                    <label className={cn(
+                      "cursor-pointer px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all font-sans",
+                      photoUploading ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                    )}>
+                      {photoUploading ? (
+                        <>Memproses...</>
+                      ) : (
+                        <><Plus size={12} /> Tambah Foto</>
+                      )}
                       <input 
                         type="file" 
                         multiple 
                         accept="image/*" 
                         className="hidden" 
+                        disabled={photoUploading}
                         onChange={async (e) => {
                           const files = e.target.files;
                           if (!files?.length) return;
                           
-                          const uploadPromises = Array.from(files as FileList).map(async (file: File) => {
-                            return await handleUpload(file, 'kegiatan');
-                          });
-                          
-                          const urls = await Promise.all(uploadPromises);
-                          setCurrentKegiatan({
-                            ...currentKegiatan,
-                            hasDokumentasi: true,
-                            dokumentasi: [...(currentKegiatan?.dokumentasi || []), ...urls]
-                          });
+                          setPhotoUploading(true);
+                          try {
+                            const uploadPromises = Array.from(files as FileList).map(async (file: File) => {
+                              return await handleUpload(file, 'kegiatan');
+                            });
+                            
+                            const urls = await Promise.all(uploadPromises);
+                            setCurrentKegiatan(prev => prev ? ({
+                              ...prev,
+                              hasDokumentasi: true,
+                              dokumentasi: [...(prev.dokumentasi || []), ...urls]
+                            }) : null);
+                          } catch (error) {
+                            console.error("Upload error:", error);
+                            alert("Gagal mengupload foto. Pastikan koneksi stabil.");
+                          } finally {
+                            setPhotoUploading(false);
+                          }
                         }} 
                       />
                     </label>

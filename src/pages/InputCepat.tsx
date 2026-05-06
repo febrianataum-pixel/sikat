@@ -21,6 +21,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../hooks/useUserRole';
 
@@ -116,8 +117,17 @@ export default function InputCepat() {
     setUploading(true);
     try {
       const uploadPromises = Array.from(files as FileList).map(async (file: File) => {
+        // Validasi file
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`File ${file.name} bukan gambar.`);
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error(`File ${file.name} terlalu besar (maksimal 10MB).`);
+        }
+
         const timestamp = Date.now();
-        const storageRef = ref(storage, `kegiatan/${auth.currentUser?.uid || 'anon'}_${timestamp}_${file.name}`);
+        const uid = auth.currentUser?.uid || 'anon';
+        const storageRef = ref(storage, `kegiatan/${uid}_${timestamp}_${file.name}`);
         const snapshot = await uploadBytes(storageRef, file);
         return await getDownloadURL(snapshot.ref);
       });
@@ -127,9 +137,9 @@ export default function InputCepat() {
         ...prev,
         dokumentasi: [...prev.dokumentasi, ...urls]
       }));
-    } catch (err) {
-      console.error(err);
-      alert('Gagal mengupload foto.');
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      alert(err.message || 'Gagal mengupload foto. Pastikan koneksi stabil dan izin storage sudah aktif.');
     } finally {
       setUploading(false);
     }
@@ -423,9 +433,16 @@ export default function InputCepat() {
                 <label className="text-xs font-bold text-slate-800 flex items-center gap-2 uppercase tracking-tight">
                   <ImageIcon size={16} className="text-indigo-500" /> Dokumentasi Kegiatan
                 </label>
-                <label className="cursor-pointer px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-bold flex items-center gap-1.5 hover:bg-emerald-100 transition-all active:scale-95">
-                  <Plus size={14} /> Tambah Foto
-                  <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                <label className={cn(
+                  "cursor-pointer px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all active:scale-95",
+                  uploading ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                )}>
+                  {uploading ? (
+                    <>Memproses...</>
+                  ) : (
+                    <><Plus size={14} /> Tambah Foto</>
+                  )}
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
                 </label>
               </div>
 
