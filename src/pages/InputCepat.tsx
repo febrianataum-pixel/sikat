@@ -520,7 +520,7 @@ export default function InputCepat() {
                     checked={formData.hasLaporan}
                     onChange={(e) => setFormData({ ...formData, hasLaporan: e.target.checked })}
                   />
-                  <span className="text-xs font-bold uppercase tracking-wide">Laporan Keluar</span>
+                  <span className="text-xs font-bold uppercase tracking-wide">Laporan</span>
                 </label>
 
                 <label className={cn(
