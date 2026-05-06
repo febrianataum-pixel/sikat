@@ -22,6 +22,8 @@ import { generateSppdDepan, generateSpt, generateRincianBiaya, generateLaporanHa
 import { DEFAULT_LOGO } from '../constants';
 import { useUserRole } from '../hooks/useUserRole';
 
+import imageCompression from 'browser-image-compression';
+
 interface Petugas {
   id: string;
   nama: string;
@@ -67,6 +69,7 @@ export default function KegiatanPage() {
   const [petugas, setPetugas] = useState<Petugas[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentKegiatan, setCurrentKegiatan] = useState<Partial<Kegiatan> | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -179,15 +182,27 @@ export default function KegiatanPage() {
     if (!file.type.startsWith('image/')) {
       throw new Error(`File ${file.name} bukan gambar.`);
     }
-    if (file.size > 10 * 1024 * 1024) {
-      throw new Error(`File ${file.name} terlalu besar (maksimal 10MB).`);
-    }
 
-    const timestamp = Date.now();
-    const uid = auth.currentUser?.uid || 'anon';
-    const storageRef = ref(storage, `${path}/${uid}_${timestamp}_${file.name}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    return getDownloadURL(snapshot.ref);
+    try {
+      // Kompresi Gambar
+      setUploadProgress(`Mengompresi ${file.name}...`);
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1280,
+        useWebWorker: true,
+      };
+      const compressedFile = await imageCompression(file, options);
+
+      setUploadProgress(`Mengunggah ${file.name}...`);
+      const timestamp = Date.now();
+      const uid = auth.currentUser?.uid || 'anon';
+      const storageRef = ref(storage, `${path}/${uid}_${timestamp}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, compressedFile);
+      return getDownloadURL(snapshot.ref);
+    } catch (error) {
+      console.error("Compression/Upload error:", error);
+      throw error;
+    }
   };
 
   const handleSave = async (e: FormEvent) => {
@@ -900,7 +915,9 @@ export default function KegiatanPage() {
                       photoUploading ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
                     )}>
                       {photoUploading ? (
-                        <>Memproses...</>
+                        <span className="flex items-center gap-1 animate-pulse">
+                          {uploadProgress || 'Memproses...'}
+                        </span>
                       ) : (
                         <><Plus size={12} /> Tambah Foto</>
                       )}
@@ -915,22 +932,28 @@ export default function KegiatanPage() {
                           if (!files?.length) return;
                           
                           setPhotoUploading(true);
+                          setUploadProgress('Menyiapkan...');
                           try {
-                            const uploadPromises = Array.from(files as FileList).map(async (file: File) => {
-                              return await handleUpload(file, 'kegiatan');
-                            });
+                            const urls: string[] = [];
+                            const fileArray = Array.from(files as FileList);
                             
-                            const urls = await Promise.all(uploadPromises);
+                            for (let i = 0; i < fileArray.length; i++) {
+                              setUploadProgress(`File ${i + 1}/${fileArray.length}...`);
+                              const url = await handleUpload(fileArray[i] as File, 'kegiatan');
+                              urls.push(url);
+                            }
+                            
                             setCurrentKegiatan(prev => prev ? ({
                               ...prev,
                               hasDokumentasi: true,
                               dokumentasi: [...(prev.dokumentasi || []), ...urls]
                             }) : null);
-                          } catch (error) {
+                          } catch (error: any) {
                             console.error("Upload error:", error);
-                            alert("Gagal mengupload foto. Pastikan koneksi stabil.");
+                            alert(error.message || "Gagal mengupload foto. Pastikan koneksi stabil.");
                           } finally {
                             setPhotoUploading(false);
+                            setUploadProgress('');
                           }
                         }} 
                       />

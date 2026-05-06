@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import imageCompression from 'browser-image-compression';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../hooks/useUserRole';
 
@@ -43,6 +44,7 @@ export default function InputCepat() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [success, setSuccess] = useState(false);
   const { userProfile, loading: roleLoading } = useUserRole(auth.currentUser);
 
@@ -115,24 +117,37 @@ export default function InputCepat() {
     if (!files || files.length === 0) return;
 
     setUploading(true);
+    setUploadProgress('Menyiapkan...');
     try {
-      const uploadPromises = Array.from(files as FileList).map(async (file: File) => {
+      const urls: string[] = [];
+      const fileArray = Array.from(files as FileList) as File[];
+      
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        
         // Validasi file
         if (!file.type.startsWith('image/')) {
           throw new Error(`File ${file.name} bukan gambar.`);
         }
-        if (file.size > 10 * 1024 * 1024) {
-          throw new Error(`File ${file.name} terlalu besar (maksimal 10MB).`);
-        }
 
+        // Kompresi Gambar
+        setUploadProgress(`Kompres ${i + 1}/${fileArray.length}...`);
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1280,
+          useWebWorker: true,
+        };
+        const compressedFile = await imageCompression(file, options);
+
+        setUploadProgress(`Unggah ${i + 1}/${fileArray.length}...`);
         const timestamp = Date.now();
         const uid = auth.currentUser?.uid || 'anon';
         const storageRef = ref(storage, `kegiatan/${uid}_${timestamp}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        return await getDownloadURL(snapshot.ref);
-      });
+        const snapshot = await uploadBytes(storageRef, compressedFile);
+        const url = await getDownloadURL(snapshot.ref);
+        urls.push(url);
+      }
 
-      const urls = await Promise.all(uploadPromises);
       setFormData(prev => ({
         ...prev,
         dokumentasi: [...prev.dokumentasi, ...urls]
@@ -142,6 +157,7 @@ export default function InputCepat() {
       alert(err.message || 'Gagal mengupload foto. Pastikan koneksi stabil dan izin storage sudah aktif.');
     } finally {
       setUploading(false);
+      setUploadProgress('');
     }
   };
 
@@ -438,7 +454,9 @@ export default function InputCepat() {
                   uploading ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
                 )}>
                   {uploading ? (
-                    <>Memproses...</>
+                    <span className="flex items-center gap-1.5 animate-pulse">
+                      {uploadProgress || 'Memproses...'}
+                    </span>
                   ) : (
                     <><Plus size={14} /> Tambah Foto</>
                   )}
