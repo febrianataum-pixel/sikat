@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate, cn } from '../lib/utils';
-import { generateSppdDepan, generateSpt, generateRincianBiaya, generateLaporanHasilPerjalanan } from '../services/pdfService';
+import { generateSppdDepan, generateSpt, generateRincianBiaya, generateLaporanHasilPerjalanan, generateDokumentasi } from '../services/pdfService';
 import { DEFAULT_LOGO } from '../constants';
 import { useUserRole } from '../hooks/useUserRole';
 
@@ -76,7 +76,7 @@ export default function KegiatanPage() {
   const [selectedKegiatanForDownload, setSelectedKegiatanForDownload] = useState<Kegiatan | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewType, setPreviewType] = useState<'sppd' | 'spt' | 'biaya' | 'hasil'>('sppd');
+  const [previewType, setPreviewType] = useState<'sppd' | 'spt' | 'biaya' | 'hasil' | 'dokumentasi'>('sppd');
   const [settings, setSettings] = useState<{ logoUrl: string, dasarHukum: string[] } | null>(null);
   const [manajemen, setManajemen] = useState<{ id: string, nama: string, nip: string, jabatan: string }[]>([]);
   const [subKegiatan, setSubKegiatan] = useState<SubKegiatan[]>([]);
@@ -341,12 +341,20 @@ export default function KegiatanPage() {
         logoUrl: settings?.logoUrl
       });
       doc.save(`HASIL_LAPORAN_${k.petugasNama}_${k.tanggal}.pdf`);
+    } else if (label === 'dokumentasi') {
+      doc = generateDokumentasi({
+        maksud: k.uraian,
+        tempat: k.tempat,
+        tanggal: k.tanggal,
+        dokumentasi: k.dokumentasi || []
+      });
+      doc.save(`DOKUMENTASI_${k.petugasNama}_${k.tanggal}.pdf`);
     } else {
       alert(`Sedang menyiapkan dokumen: ${label}`);
     }
   };
 
-  const handlePreviewDoc = (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil') => {
+  const handlePreviewDoc = (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil' | 'dokumentasi') => {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return;
 
@@ -434,6 +442,14 @@ export default function KegiatanPage() {
         hasil: k.hasilPerjalanan || [],
         dokumentasi: k.dokumentasi || [],
         logoUrl: settings?.logoUrl
+      });
+    } else if (type === 'dokumentasi') {
+      setPreviewType('dokumentasi');
+      doc = generateDokumentasi({
+        maksud: k.uraian,
+        tempat: k.tempat,
+        tanggal: k.tanggal,
+        dokumentasi: k.dokumentasi || []
       });
     }
 
@@ -1032,6 +1048,7 @@ export default function KegiatanPage() {
                     { title: 'Surat Perintah Tugas (SPT)', desc: 'Surat perintah penugasan resmi', icon: FileIcon, label: 'spt' },
                     { title: 'Rincian Biaya', desc: 'Rincian estimasi atau realisasi pengeluaran', icon: FileIcon, label: 'biaya' },
                     { title: 'Laporan Hasil', desc: 'Laporan hasil pelaksanaan perjalanan dinas', icon: FileIcon, label: 'hasil' },
+                    { title: 'Dokumentasi', desc: 'Lampiran foto-foto kegiatan', icon: ImageIcon, label: 'dokumentasi' },
                   ].map((doc, i) => (
                     <button
                       key={i}
@@ -1110,6 +1127,15 @@ export default function KegiatanPage() {
                     )}
                   >
                     Hasil
+                  </button>
+                  <button
+                    onClick={() => handlePreviewDoc(selectedKegiatanForDownload, 'dokumentasi')}
+                    className={cn(
+                      "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
+                      previewType === 'dokumentasi' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    )}
+                  >
+                    Foto
                   </button>
                 </div>
                 <div className="flex items-center gap-4">

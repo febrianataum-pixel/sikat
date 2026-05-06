@@ -643,24 +643,44 @@ export const generateLaporanHasilPerjalanan = (data: {
   doc.text('........................', 175, currentY);
   currentY += 10;
 
-  // DOKUMENTASI PAGE
-  if (data.dokumentasi && data.dokumentasi.length > 0) {
-    doc.addPage();
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('LAMPIRAN DOKUMENTASI KEGIATAN', 105, 20, { align: 'center' });
-    
-    // Kop reference
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Kegiatan : ${data.maksud}`, 15, 30);
-    doc.text(`Tempat   : ${data.tempat}`, 15, 35);
-    doc.text(`Tanggal  : ${formatDateShort(data.tanggalSpt)}`, 15, 40);
+  return doc;
+};
 
-    let photoY = 50;
-    let photoX = 15;
-    const photoWidth = 85;
+export const generateDokumentasi = (data: {
+  maksud: string;
+  tempat: string;
+  tanggal: string;
+  dokumentasi: string[];
+}) => {
+  const doc = new jsPDF({
+    orientation: 'p',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const formatDateShort = (dateStr: string) => {
+    const dateArr = dateStr.split('-');
+    if (dateArr.length !== 3) return dateStr;
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    return `${dateArr[2]} ${months[parseInt(dateArr[1]) - 1]} ${dateArr[0]}`;
+  };
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('DOKUMENTASI', 105, 30, { align: 'center' });
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text(data.maksud, 105, 37, { align: 'center' });
+  doc.text(data.tempat, 105, 43, { align: 'center' });
+  doc.text(formatDateShort(data.tanggal), 105, 49, { align: 'center' });
+
+  if (data.dokumentasi && data.dokumentasi.length > 0) {
+    let photoY = 65;
+    let photoX = 20;
+    const photoWidth = 80;
     const photoHeight = 60;
+    const gap = 10;
 
     data.dokumentasi.forEach((url, i) => {
       if (photoY + photoHeight > 280) {
@@ -678,10 +698,13 @@ export const generateLaporanHasilPerjalanan = (data: {
       if (i % 2 === 0) {
         photoX = 110;
       } else {
-        photoX = 15;
-        photoY += photoHeight + 10;
+        photoX = 20;
+        photoY += photoHeight + gap;
       }
     });
+  } else {
+    doc.setFontSize(10);
+    doc.text('(Belum ada dokumentasi ditambahkan)', 105, 70, { align: 'center' });
   }
 
   return doc;
