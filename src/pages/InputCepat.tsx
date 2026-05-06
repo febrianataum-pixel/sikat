@@ -119,6 +119,7 @@ export default function InputCepat() {
         ...formData,
         petugasNama: pNama,
         hasLaporan: false,
+        hasDokumentasi: false,
         hasSppd: false,
         laporanSelesai: false,
         nomor: '',
