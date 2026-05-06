@@ -1,30 +1,21 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, where } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage, auth } from '../lib/firebase';
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { db, auth } from '../lib/firebase';
 import { 
   Plus, 
   Edit2, 
   Trash2, 
   X, 
-  Image as ImageIcon, 
   FileText as FileIcon,
-  CheckCircle,
-  AlertCircle,
-  ChevronDown,
   Search,
   Download,
-  ShieldAlert,
-  Loader2,
-  FileCheck2
+  ChevronDown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate, cn } from '../lib/utils';
-import { generateSppdDepan, generateSpt, generateRincianBiaya, generateLaporanHasilPerjalanan, generateDokumentasi } from '../services/pdfService';
+import { generateSppdDepan, generateSpt, generateRincianBiaya, generateLaporanHasilPerjalanan } from '../services/pdfService';
 import { DEFAULT_LOGO } from '../constants';
 import { useUserRole } from '../hooks/useUserRole';
-
-import imageCompression from 'browser-image-compression';
 
 interface Petugas {
   id: string;
@@ -47,11 +38,9 @@ interface Kegiatan {
   uraian: string;
   lamaPerjalanan: number;
   hasLaporan: boolean;
-  hasDokumentasi: boolean;
   hasSppd: boolean;
   laporanSelesai: boolean;
   hasilPerjalanan?: string[];
-  dokumentasi?: string[];
   createdAt: string;
   updatedAt: string;
   createdByEmail?: string;
@@ -70,8 +59,6 @@ export default function KegiatanPage() {
   const [kegiatan, setKegiatan] = useState<Kegiatan[]>([]);
   const [petugas, setPetugas] = useState<Petugas[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentKegiatan, setCurrentKegiatan] = useState<Partial<Kegiatan> | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -80,11 +67,9 @@ export default function KegiatanPage() {
   const [isPetugasDropdownOpen, setIsPetugasDropdownOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [selectedKegiatanForDownload, setSelectedKegiatanForDownload] = useState<Kegiatan | null>(null);
-  const [isManagePhotoModalOpen, setIsManagePhotoModalOpen] = useState(false);
-  const [selectedKegiatanForPhoto, setSelectedKegiatanForPhoto] = useState<Kegiatan | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewType, setPreviewType] = useState<'sppd' | 'spt' | 'biaya' | 'hasil' | 'dokumentasi'>('sppd');
+  const [previewType, setPreviewType] = useState<'sppd' | 'spt' | 'biaya' | 'hasil'>('sppd');
   const [settings, setSettings] = useState<{ logoUrl: string, dasarHukum: string[] } | null>(null);
   const [manajemen, setManajemen] = useState<{ id: string, nama: string, nip: string, jabatan: string }[]>([]);
   const [subKegiatan, setSubKegiatan] = useState<SubKegiatan[]>([]);
@@ -181,57 +166,6 @@ export default function KegiatanPage() {
     }
   };
 
-  const handleUpload = async (file: File, path: string, onProgress?: (p: string) => void) => {
-    // Validasi file
-    if (!file.type.startsWith('image/')) {
-      throw new Error(`File ${file.name} bukan gambar.`);
-    }
-
-    try {
-      if (onProgress) onProgress(`Memproses...`);
-      console.log("[Upload] Memproses:", file.name);
-      
-      let fileToUpload: File | Blob = file;
-      try {
-        const options = {
-          maxSizeMB: 0.4,
-          maxWidthOrHeight: 1200,
-          useWebWorker: true,
-          maxIteration: 5
-        };
-        // Skip compression if fails or slow
-        const compPromise = imageCompression(file, options);
-        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 7000));
-        const compressed = await Promise.race([compPromise, timeout]);
-        if (compressed) {
-          fileToUpload = compressed;
-          console.log("[Upload] Kompresi ok. Ukuran:", fileToUpload.size);
-        }
-      } catch (err) {
-        console.warn("[Upload] Gagal kompresi, gunakan original:", err);
-      }
-
-      const timestamp = Date.now();
-      const user = auth.currentUser;
-      if (!user) throw new Error("Sesi berakhir. Silakan login kembali.");
-      
-      const storageRef = ref(storage, `${path}/${user.uid}_${timestamp}_${file.name}`);
-      console.log("[Upload] Memulai unggah ke:", storageRef.fullPath);
-      
-      if (onProgress) onProgress(`Mengirim...`);
-      
-      const snapshot = await uploadBytes(storageRef, fileToUpload);
-      console.log("[Upload] Unggah selesai, mengambil URL...");
-      const url = await getDownloadURL(snapshot.ref);
-      
-      console.log("[Upload] BERHASIL:", url);
-      return url;
-    } catch (error: any) {
-      console.error("[Upload] ERROR:", error);
-      throw new Error(error.message || "Gagal mengunggah foto.");
-    }
-  };
-
   const handleSave = async (e: FormEvent) => {
     e.preventDefault();
     if (!currentKegiatan?.petugasId || !currentKegiatan?.tanggal || !currentKegiatan?.tempat) return;
@@ -239,7 +173,7 @@ export default function KegiatanPage() {
     try {
       const pNama = petugas.find(p => p.id === currentKegiatan.petugasId)?.nama || '';
       
-      const isComplete = !!(currentKegiatan.hasLaporan && currentKegiatan.hasDokumentasi && currentKegiatan.hasSppd);
+      const isComplete = !!(currentKegiatan.hasLaporan && currentKegiatan.hasSppd);
 
       const fullNomor = currentKegiatan.nomorUrut || '';
 
@@ -255,11 +189,9 @@ export default function KegiatanPage() {
         uraian: currentKegiatan.uraian || '',
         lamaPerjalanan: currentKegiatan.lamaPerjalanan || 1,
         hasLaporan: !!currentKegiatan.hasLaporan,
-        hasDokumentasi: !!currentKegiatan.hasDokumentasi,
         hasSppd: !!currentKegiatan.hasSppd,
         laporanSelesai: isComplete,
         hasilPerjalanan: currentKegiatan.hasilPerjalanan || [],
-        dokumentasi: currentKegiatan.dokumentasi || [],
         jenisWilayah: currentKegiatan.jenisWilayah || 'Dalam Daerah',
         biayaTransport: currentKegiatan.biayaTransport || 0,
         updatedAt: new Date().toISOString()
@@ -390,24 +322,16 @@ export default function KegiatanPage() {
         tempat: k.tempat,
         petugas: { nama: k.petugasNama },
         hasil: k.hasilPerjalanan || [],
-        dokumentasi: k.dokumentasi || [],
+        dokumentasi: [],
         logoUrl: settings?.logoUrl
       });
       doc.save(`HASIL_LAPORAN_${k.petugasNama}_${k.tanggal}.pdf`);
-    } else if (label === 'dokumentasi') {
-      doc = generateDokumentasi({
-        maksud: k.uraian,
-        tempat: k.tempat,
-        tanggal: k.tanggal,
-        dokumentasi: k.dokumentasi || []
-      });
-      doc.save(`DOKUMENTASI_${k.petugasNama}_${k.tanggal}.pdf`);
     } else {
       alert(`Sedang menyiapkan dokumen: ${label}`);
     }
   };
 
-  const handlePreviewDoc = (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil' | 'dokumentasi') => {
+  const handlePreviewDoc = (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil') => {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return;
 
@@ -493,16 +417,8 @@ export default function KegiatanPage() {
         tempat: k.tempat,
         petugas: { nama: k.petugasNama },
         hasil: k.hasilPerjalanan || [],
-        dokumentasi: k.dokumentasi || [],
+        dokumentasi: [],
         logoUrl: settings?.logoUrl
-      });
-    } else if (type === 'dokumentasi') {
-      setPreviewType('dokumentasi');
-      doc = generateDokumentasi({
-        maksud: k.uraian,
-        tempat: k.tempat,
-        tanggal: k.tanggal,
-        dokumentasi: k.dokumentasi || []
       });
     }
 
@@ -514,6 +430,7 @@ export default function KegiatanPage() {
   };
 
   const handleDelete = async () => {
+
     if (!deleteId) return;
     try {
       await deleteDoc(doc(db, 'kegiatan', deleteId));
@@ -652,16 +569,6 @@ export default function KegiatanPage() {
                     </button>
                   </td>
                   <td className="px-6 py-4 text-right space-x-1">
-                    <button
-                      onClick={() => {
-                        setSelectedKegiatanForPhoto(k);
-                        setIsManagePhotoModalOpen(true);
-                      }}
-                      title="Kelola Foto Dokumentasi"
-                      className="p-1.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                    >
-                      <ImageIcon size={16} />
-                    </button>
                     <button
                       onClick={() => {
                         setCurrentKegiatan(k);
@@ -945,7 +852,7 @@ export default function KegiatanPage() {
 
                 <div className="space-y-4">
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Verifikasi Kelengkapan (Ceklis)</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className={cn(
                       "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
                       currentKegiatan?.hasLaporan ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
@@ -957,19 +864,6 @@ export default function KegiatanPage() {
                         onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, hasLaporan: e.target.checked })}
                       />
                       <span className="text-xs font-bold uppercase tracking-wide">Laporan</span>
-                    </label>
-
-                    <label className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
-                      currentKegiatan?.hasDokumentasi ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-100 text-slate-500"
-                    )}>
-                      <input
-                        type="checkbox"
-                        className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                        checked={currentKegiatan?.hasDokumentasi || false}
-                        onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, hasDokumentasi: e.target.checked })}
-                      />
-                      <span className="text-xs font-bold uppercase tracking-wide">Dokumentasi</span>
                     </label>
 
                     <label className={cn(
@@ -1054,8 +948,7 @@ export default function KegiatanPage() {
                     { title: 'SPPD Depan', desc: 'Halaman depan Surat Perjalanan Dinas', icon: FileIcon, label: 'sppd_depan' },
                     { title: 'Surat Perintah Tugas (SPT)', desc: 'Surat perintah penugasan resmi', icon: FileIcon, label: 'spt' },
                     { title: 'Rincian Biaya', desc: 'Rincian estimasi atau realisasi pengeluaran', icon: FileIcon, label: 'biaya' },
-                    { title: 'Laporan Hasil', desc: 'Laporan hasil pelaksanaan perjalanan dinas', icon: FileIcon, label: 'hasil' },
-                    { title: 'Dokumentasi', desc: 'Lampiran foto-foto kegiatan', icon: ImageIcon, label: 'dokumentasi' },
+                    { title: 'Laporan Hasil', desc: 'Laporan hasil pelaksanaan perjalanan dinas', icon: FileIcon, label: 'hasil' }
                   ].map((doc, i) => (
                     <button
                       key={i}
@@ -1135,15 +1028,6 @@ export default function KegiatanPage() {
                   >
                     Hasil
                   </button>
-                  <button
-                    onClick={() => handlePreviewDoc(selectedKegiatanForDownload, 'dokumentasi')}
-                    className={cn(
-                      "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
-                      previewType === 'dokumentasi' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                    )}
-                  >
-                    Foto
-                  </button>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="hidden sm:block text-right">
@@ -1173,182 +1057,6 @@ export default function KegiatanPage() {
                   className="w-full h-full rounded-lg shadow-inner bg-white"
                   title="PDF Preview"
                 />
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isManagePhotoModalOpen && selectedKegiatanForPhoto && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => {
-                if (!photoUploading) setIsManagePhotoModalOpen(false);
-              }}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 50, scale: 0.95 }}
-              className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]"
-            >
-              <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white sticky top-0 z-10">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-                    <ImageIcon size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800">Dokumentasi Kegiatan</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedKegiatanForPhoto.tempat}</p>
-                  </div>
-                </div>
-                <button 
-                  disabled={photoUploading}
-                  onClick={() => setIsManagePhotoModalOpen(false)}
-                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors disabled:opacity-50"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="p-6 overflow-y-auto flex-1">
-                <div className="mb-6 flex items-center justify-between">
-                  <p className="text-xs font-medium text-slate-500">
-                    Daftar foto dokumentasi untuk kegiatan petugas <span className="font-bold text-slate-800">{selectedKegiatanForPhoto.petugasNama}</span>
-                  </p>
-                  
-                  <label className={cn(
-                    "cursor-pointer px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm",
-                    photoUploading ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
-                  )}>
-                    {photoUploading ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Plus size={16} />
-                    )}
-                    {photoUploading ? (uploadProgress || 'Mengunggah...') : 'Tambah Foto'}
-                    <input 
-                      type="file" 
-                      multiple 
-                      accept="image/*" 
-                      className="hidden" 
-                      disabled={photoUploading}
-                      onChange={async (e) => {
-                        const files = e.target.files;
-                        if (!files?.length) return;
-                        
-                        setPhotoUploading(true);
-                        try {
-                          const newUrls: string[] = [];
-                          const fileArray = Array.from(files as FileList);
-                          const total = fileArray.length;
-                          
-                          for (let i = 0; i < fileArray.length; i++) {
-                            const url = await handleUpload(
-                              fileArray[i] as File, 
-                              'kegiatan',
-                              (p) => setUploadProgress(`[${i + 1}/${total}] ${p}`)
-                            );
-                            if (url) newUrls.push(url);
-                          }
-                          
-                          if (newUrls.length > 0) {
-                            const updatedDocs = [...(selectedKegiatanForPhoto.dokumentasi || []), ...newUrls];
-                            const kegiatanRef = doc(db, 'kegiatan', selectedKegiatanForPhoto.id);
-                            await updateDoc(kegiatanRef, {
-                              dokumentasi: updatedDocs,
-                              hasDokumentasi: true,
-                              updatedAt: new Date().toISOString()
-                            });
-                            
-                            // Update local state
-                            setKegiatan(prev => prev.map(k => 
-                              k.id === selectedKegiatanForPhoto.id 
-                                ? { ...k, dokumentasi: updatedDocs, hasDokumentasi: true } 
-                                : k
-                            ));
-                            setSelectedKegiatanForPhoto((prev: any) => ({
-                              ...prev,
-                              dokumentasi: updatedDocs,
-                              hasDokumentasi: true
-                            }));
-                          }
-                        } catch (error: any) {
-                          console.error("Upload error:", error);
-                          alert(error.message || "Gagal mengunggah foto.");
-                        } finally {
-                          setPhotoUploading(false);
-                          setUploadProgress('');
-                          e.target.value = '';
-                        }
-                      }} 
-                    />
-                  </label>
-                </div>
-
-                {((selectedKegiatanForPhoto.dokumentasi || []).length > 0) ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {selectedKegiatanForPhoto.dokumentasi.map((url: string, index: number) => (
-                      <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 group bg-slate-50 shadow-sm">
-                        <img 
-                          src={url} 
-                          alt={`Doc ${index + 1}`} 
-                          className="w-full h-full object-cover" 
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (window.confirm('Hapus foto ini?')) {
-                                const newDocs = selectedKegiatanForPhoto.dokumentasi.filter((_: any, i: number) => i !== index);
-                                const kegiatanRef = doc(db, 'kegiatan', selectedKegiatanForPhoto.id);
-                                await updateDoc(kegiatanRef, {
-                                  dokumentasi: newDocs,
-                                  hasDokumentasi: newDocs.length > 0,
-                                  updatedAt: new Date().toISOString()
-                                });
-                                
-                                setKegiatan(prev => prev.map(k => 
-                                  k.id === selectedKegiatanForPhoto.id 
-                                    ? { ...k, dokumentasi: newDocs, hasDokumentasi: newDocs.length > 0 } 
-                                    : k
-                                ));
-                                setSelectedKegiatanForPhoto((prev: any) => ({
-                                  ...prev,
-                                  dokumentasi: newDocs,
-                                  hasDokumentasi: newDocs.length > 0
-                                }));
-                              }
-                            }}
-                            className="p-2 bg-rose-500 text-white rounded-full hover:bg-rose-600 transition-colors shadow-lg"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-20 bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-3xl flex flex-col items-center justify-center text-slate-400 gap-4 text-center">
-                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-300">
-                      <ImageIcon size={32} strokeWidth={1.5} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Belum ada foto</p>
-                      <p className="text-xs text-slate-400 mt-1">Gunakan tombol 'Tambah Foto' untuk mulai mengunggah</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-4 bg-slate-50/50 border-t border-slate-50 text-center">
-                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Dokumentasi Digital • SIKAT</span>
               </div>
             </motion.div>
           </div>

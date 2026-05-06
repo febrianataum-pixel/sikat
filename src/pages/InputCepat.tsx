@@ -13,11 +13,7 @@ import {
   ChevronDown,
   FileText,
   Plus,
-  X,
-  Image as ImageIcon,
-  Camera,
-  Loader2,
-  Trash2
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -123,7 +119,6 @@ export default function InputCepat() {
         ...formData,
         petugasNama: pNama,
         hasLaporan: false,
-        hasDokumentasi: false,
         hasSppd: false,
         laporanSelesai: false,
         nomor: '',
