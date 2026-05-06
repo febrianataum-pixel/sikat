@@ -181,7 +181,7 @@ export default function KegiatanPage() {
     try {
       const pNama = petugas.find(p => p.id === currentKegiatan.petugasId)?.nama || '';
       
-      const isComplete = !!(currentKegiatan.hasLaporan && currentKegiatan.hasDokumentasi && currentKegiatan.hasSppd);
+      const isComplete = !!(currentKegiatan.hasLaporan && currentKegiatan.hasDokumentasi && currentKegiatan.hasSppd && currentKegiatan.nomorUrut);
 
       const fullNomor = currentKegiatan.nomorUrut || '';
 
@@ -597,12 +597,17 @@ export default function KegiatanPage() {
                       >
                         {k.petugasNama}
                       </button>
-                      {!k.laporanSelesai && (
-                        <span className="text-[9px] font-bold text-rose-500 uppercase tracking-tighter mt-0.5 bg-rose-50 px-1.5 py-0.5 rounded-full w-fit">Belum Terverifikasi</span>
-                      )}
-                      {k.laporanSelesai && (
-                        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-tighter mt-0.5 bg-emerald-50 px-1.5 py-0.5 rounded-full w-fit">Terverifikasi</span>
-                      )}
+                      {(() => {
+                        const isFull = k.hasLaporan && k.hasDokumentasi && k.hasSppd;
+                        const hasNomor = !!k.nomorUrut;
+                        if (isFull && hasNomor) {
+                          return <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-tighter mt-0.5 bg-emerald-50 px-1.5 py-0.5 rounded-full w-fit">Terverifikasi</span>;
+                        }
+                        if (isFull && !hasNomor) {
+                          return <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter mt-0.5 bg-amber-50 px-1.5 py-0.5 rounded-full w-fit border border-amber-200">Perhatian: No. Surat Kosong</span>;
+                        }
+                        return <span className="text-[9px] font-bold text-rose-500 uppercase tracking-tighter mt-0.5 bg-rose-50 px-1.5 py-0.5 rounded-full w-fit">Belum Terverifikasi</span>;
+                      })()}
                     </div>
                   </td>
                   <td className="px-6 py-4">

@@ -32,6 +32,8 @@ interface Kegiatan {
   hasLaporan: boolean;
   hasDokumentasi: boolean;
   hasSppd: boolean;
+  laporanSelesai: boolean;
+  nomorUrut?: string;
 }
 
 interface ChartItem {
@@ -93,7 +95,8 @@ export default function Dashboard() {
         filteredKegiatan.forEach(data => {
           const d = new Date(data.tanggal);
           if (d >= startOfMonth) thisMonthCount++;
-          if (!data.hasLaporan || !data.hasDokumentasi || !data.hasSppd) pendingLaporan++;
+          const isVerified = !!(data.hasLaporan && data.hasDokumentasi && data.hasSppd && (data as any).nomorUrut);
+          if (!isVerified) pendingLaporan++;
         });
 
         setStats({
@@ -134,7 +137,7 @@ export default function Dashboard() {
         return kegiatanData.filter(k => new Date(k.tanggal) >= startOfMonth);
       }
       if (selectedStat === 'Laporan Pending') {
-        return kegiatanData.filter(k => !k.hasLaporan || !k.hasDokumentasi || !k.hasSppd);
+        return kegiatanData.filter(k => !(k.hasLaporan && k.hasDokumentasi && k.hasSppd && (k as any).nomorUrut));
       }
     }
     if (!selectedPetugas) return [];
@@ -473,7 +476,7 @@ export default function Dashboard() {
                               <p className="text-[10px] text-slate-500">{act.tempat}</p>
                               <div className={cn(
                                 "w-2 h-2 rounded-full",
-                                act.hasLaporan && act.hasDokumentasi && act.hasSppd ? "bg-emerald-500" : "bg-orange-500"
+                                act.hasLaporan && act.hasDokumentasi && act.hasSppd && (act as any).nomorUrut ? "bg-emerald-500" : "bg-orange-500"
                               )}></div>
                             </div>
                           </div>
