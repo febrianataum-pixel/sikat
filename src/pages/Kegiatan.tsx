@@ -46,6 +46,8 @@ interface Kegiatan {
   hasDokumentasi: boolean;
   hasSppd: boolean;
   laporanSelesai: boolean;
+  hasilPerjalanan?: string[];
+  dokumentasi?: string[];
   createdAt: string;
   updatedAt: string;
   createdByEmail?: string;
@@ -203,6 +205,8 @@ export default function KegiatanPage() {
         hasDokumentasi: !!currentKegiatan.hasDokumentasi,
         hasSppd: !!currentKegiatan.hasSppd,
         laporanSelesai: isComplete,
+        hasilPerjalanan: currentKegiatan.hasilPerjalanan || [],
+        dokumentasi: currentKegiatan.dokumentasi || [],
         jenisWilayah: currentKegiatan.jenisWilayah || 'Luar Daerah',
         biayaTransport: currentKegiatan.biayaTransport || 0,
         updatedAt: new Date().toISOString()
@@ -779,6 +783,112 @@ export default function KegiatanPage() {
                     value={currentKegiatan?.uraian || ''}
                     onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, uraian: e.target.value })}
                   />
+                </div>
+
+                {/* Hasil Perjalanan Dinas */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hasil Perjalanan Dinas</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newHasil = [...(currentKegiatan?.hasilPerjalanan || []), ''];
+                        setCurrentKegiatan({ ...currentKegiatan, hasilPerjalanan: newHasil });
+                      }}
+                      className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-bold flex items-center gap-1 hover:bg-emerald-100 transition-all font-sans"
+                    >
+                      <Plus size={12} /> Tambah Hasil
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {(currentKegiatan?.hasilPerjalanan || ['']).map((hasil, index) => (
+                      <div key={index} className="flex gap-2 items-start">
+                        <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-bold shrink-0 mt-2">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 relative group">
+                          <textarea
+                            value={hasil}
+                            onChange={(e) => {
+                              const newHasil = [...(currentKegiatan?.hasilPerjalanan || [])];
+                              newHasil[index] = e.target.value;
+                              setCurrentKegiatan({ ...currentKegiatan, hasilPerjalanan: newHasil });
+                            }}
+                            placeholder={`Hasil ke-${index + 1}...`}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded text-sm min-h-[60px] resize-none outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                          {(currentKegiatan?.hasilPerjalanan || []).length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newHasil = (currentKegiatan?.hasilPerjalanan || []).filter((_, i) => i !== index);
+                                setCurrentKegiatan({ ...currentKegiatan, hasilPerjalanan: newHasil });
+                              }}
+                              className="absolute -right-2 -top-2 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dokumentasi */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dokumentasi</label>
+                    <label className="cursor-pointer px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-bold flex items-center gap-1 hover:bg-emerald-100 transition-all font-sans">
+                      <Plus size={12} /> Tambah Foto
+                      <input 
+                        type="file" 
+                        multiple 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={async (e) => {
+                          const files = e.target.files;
+                          if (!files?.length) return;
+                          
+                          const uploadPromises = Array.from(files as FileList).map(async (file: File) => {
+                            return await handleUpload(file, 'kegiatan');
+                          });
+                          
+                          const urls = await Promise.all(uploadPromises);
+                          setCurrentKegiatan({
+                            ...currentKegiatan,
+                            hasDokumentasi: true,
+                            dokumentasi: [...(currentKegiatan?.dokumentasi || []), ...urls]
+                          });
+                        }} 
+                      />
+                    </label>
+                  </div>
+                  
+                  {((currentKegiatan?.dokumentasi || []).length > 0) ? (
+                    <div className="grid grid-cols-4 gap-2">
+                      {currentKegiatan?.dokumentasi?.map((url, index) => (
+                        <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100 group">
+                          <img src={url} alt="Doc" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newDocs = currentKegiatan?.dokumentasi?.filter((_, i) => i !== index);
+                              setCurrentKegiatan({ ...currentKegiatan, dokumentasi: newDocs, hasDokumentasi: (newDocs?.length || 0) > 0 });
+                            }}
+                            className="absolute inset-0 bg-rose-500/80 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-8 bg-slate-50 border-2 border-dashed border-slate-100 rounded-lg flex flex-col items-center justify-center text-slate-400 gap-2">
+                      <ImageIcon size={24} />
+                      <p className="text-[10px] font-medium uppercase tracking-widest">Belum ada foto</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">

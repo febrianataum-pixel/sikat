@@ -1,6 +1,7 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
+import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from '../lib/firebase';
 import { 
   Send, 
   User, 
@@ -10,7 +11,14 @@ import {
   CheckCircle2, 
   ArrowLeft,
   Search,
-  ChevronDown
+  ChevronDown,
+  FileText,
+  Plus,
+  X,
+  Image as ImageIcon,
+  Camera,
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -33,6 +41,7 @@ export default function InputCepat() {
   const [subKegiatan, setSubKegiatan] = useState<SubKegiatan[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState<boolean>(false);
   const [success, setSuccess] = useState(false);
   const { userProfile, loading: roleLoading } = useUserRole(auth.currentUser);
 
@@ -42,7 +51,9 @@ export default function InputCepat() {
     tempat: '',
     uraian: '',
     subKegiatanId: '',
-    lamaPerjalanan: 1
+    lamaPerjalanan: 1,
+    hasilPerjalanan: [''],
+    dokumentasi: [] as string[]
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,6 +90,58 @@ export default function InputCepat() {
     }
   }, [userProfile, formData.petugasId, subKegiatan]);
 
+  const addHasil = () => {
+    setFormData(prev => ({
+      ...prev,
+      hasilPerjalanan: [...prev.hasilPerjalanan, '']
+    }));
+  };
+
+  const updateHasil = (index: number, val: string) => {
+    const newHasil = [...formData.hasilPerjalanan];
+    newHasil[index] = val;
+    setFormData({ ...formData, hasilPerjalanan: newHasil });
+  };
+
+  const removeHasil = (index: number) => {
+    if (formData.hasilPerjalanan.length <= 1) return;
+    const newHasil = formData.hasilPerjalanan.filter((_, i) => i !== index);
+    setFormData({ ...formData, hasilPerjalanan: newHasil });
+  };
+
+  const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const uploadPromises = Array.from(files as FileList).map(async (file: File) => {
+        const timestamp = Date.now();
+        const storageRef = ref(storage, `kegiatan/${auth.currentUser?.uid || 'anon'}_${timestamp}_${file.name}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        return await getDownloadURL(snapshot.ref);
+      });
+
+      const urls = await Promise.all(uploadPromises);
+      setFormData(prev => ({
+        ...prev,
+        dokumentasi: [...prev.dokumentasi, ...urls]
+      }));
+    } catch (err) {
+      console.error(err);
+      alert('Gagal mengupload foto.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      dokumentasi: prev.dokumentasi.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.petugasId || !formData.tempat || !formData.uraian || !formData.subKegiatanId) {
@@ -94,7 +157,7 @@ export default function InputCepat() {
         ...formData,
         petugasNama: pNama,
         hasLaporan: false,
-        hasDokumentasi: false,
+        hasDokumentasi: formData.dokumentasi.length > 0,
         hasSppd: false,
         laporanSelesai: false,
         nomor: '',
@@ -306,10 +369,107 @@ export default function InputCepat() {
               />
             </div>
 
+            {/* Hasil Perjalanan Dinas */}
+            <div className="space-y-4 pt-4 border-t border-slate-50">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-2 uppercase tracking-tight">
+                  <FileText size={16} className="text-indigo-500" /> Hasil Perjalanan Dinas
+                </label>
+                <button
+                  type="button"
+                  onClick={addHasil}
+                  className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-bold flex items-center gap-1.5 hover:bg-emerald-100 transition-all active:scale-95"
+                >
+                  <Plus size={14} /> Tambah Hasil
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {formData.hasilPerjalanan.map((hasil, index) => (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    key={index} 
+                    className="flex gap-3 items-start"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-emerald-100/50 text-emerald-600 flex items-center justify-center text-xs font-bold shrink-0 mt-3">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 relative group">
+                      <textarea
+                        value={hasil}
+                        onChange={(e) => updateHasil(index, e.target.value)}
+                        placeholder={`Tuliskan hasil ke-${index + 1}...`}
+                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium text-slate-700 min-h-[80px] resize-none outline-indigo-500"
+                      />
+                      {formData.hasilPerjalanan.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeHasil(index)}
+                          className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Dokumentasi Kegiatan */}
+            <div className="space-y-4 pt-4 border-t border-slate-50">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-2 uppercase tracking-tight">
+                  <ImageIcon size={16} className="text-indigo-500" /> Dokumentasi Kegiatan
+                </label>
+                <label className="cursor-pointer px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-bold flex items-center gap-1.5 hover:bg-emerald-100 transition-all active:scale-95">
+                  <Plus size={14} /> Tambah Foto
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                </label>
+              </div>
+
+              {formData.dokumentasi.length === 0 ? (
+                <div className="bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-3xl p-10 flex flex-col items-center justify-center text-slate-400 gap-3">
+                  {uploading ? (
+                    <Loader2 size={32} className="animate-spin text-indigo-500" />
+                  ) : (
+                    <ImageIcon size={32} strokeWidth={1.5} />
+                  )}
+                  <p className="text-xs font-medium">Belum ada dokumentasi ditambahkan</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {formData.dokumentasi.map((url, index) => (
+                    <motion.div 
+                      key={index}
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="relative aspect-square rounded-2xl overflow-hidden group border border-slate-100"
+                    >
+                      <img src={url} alt={`Doc ${index + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(index)}
+                        className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </motion.div>
+                  ))}
+                  {uploading && (
+                    <div className="aspect-square rounded-2xl bg-slate-50 flex items-center justify-center">
+                      <Loader2 size={24} className="animate-spin text-indigo-500" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || uploading}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-5 rounded-3xl shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-50"
             >
               <Send size={20} />
