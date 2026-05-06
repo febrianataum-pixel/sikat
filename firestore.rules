@@ -34,26 +34,32 @@ service cloud.firestore {
     // 2. Validation Blueprints
     function isValidPetugas(data) {
       return data.nama is string && data.nama.size() > 0 &&
-             data.jenis in ['TKSK', 'TAGANA'];
+             data.jenis in ['TKSK Blora', 'TAGANA Blora', 'ASN', 'PPPK'];
     }
 
     function isValidKegiatan(data) {
       return data.petugasId is string &&
              data.tanggal is string &&
              data.tempat is string &&
-             data.uraian is string;
+             data.uraian is string &&
+             (!('hasilPerjalanan' in data) || data.hasilPerjalanan is list) &&
+             (!('dokumentasi' in data) || data.dokumentasi is list);
     }
 
     // Petugas rules
     match /petugas/{petugasId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow create: if isSignedIn() && isValidPetugas(incoming());
+      allow update: if isSignedIn() && isValidPetugas(incoming());
+      allow delete: if isSignedIn();
     }
 
     // Kegiatan rules
     match /kegiatan/{kegiatanId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow create: if isSignedIn() && isValidKegiatan(incoming());
+      allow update: if isSignedIn() && isValidKegiatan(incoming());
+      allow delete: if isSignedIn();
     }
 
     // Settings rules
