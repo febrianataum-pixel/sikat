@@ -43,6 +43,22 @@ interface ChartItem {
   fullData: Petugas;
 }
 
+const months = [
+  'Semua Bulan',
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember'
+];
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { role, userProfile, loading: roleLoading } = useUserRole(auth.currentUser);
@@ -57,6 +73,8 @@ export default function Dashboard() {
   const [kegiatanData, setKegiatanData] = useState<Kegiatan[]>([]);
   const [selectedPetugas, setSelectedPetugas] = useState<Petugas | null>(null);
   const [selectedStat, setSelectedStat] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number>(0);
+  const [selectedYear, setSelectedYear] = useState<string>('all');
 
   useEffect(() => {
     async function fetchData() {
@@ -115,9 +133,37 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    kegiatanData.forEach(k => {
+      if (k.tanggal) {
+        const yr = k.tanggal.split('-')[0];
+        if (yr && yr.length === 4) {
+          years.add(yr);
+        }
+      }
+    });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [kegiatanData]);
+
+  const filteredActivitiesForChart = useMemo(() => {
+    return kegiatanData.filter(k => {
+      if (!k.tanggal) return false;
+      const dateParts = k.tanggal.split('-');
+      if (dateParts.length < 3) return false;
+      const year = dateParts[0];
+      const month = parseInt(dateParts[1], 10);
+
+      const matchesMonth = selectedMonth === 0 || month === selectedMonth;
+      const matchesYear = selectedYear === 'all' || year === selectedYear;
+
+      return matchesMonth && matchesYear;
+    });
+  }, [kegiatanData, selectedMonth, selectedYear]);
+
   const chartData = useMemo((): ChartItem[] => {
     return petugasData.map(p => {
-      const count = kegiatanData.filter(k => k.petugasId === p.id).length;
+      const count = filteredActivitiesForChart.filter(k => k.petugasId === p.id).length;
       return {
         id: p.id,
         nama: p.nama,
@@ -125,7 +171,7 @@ export default function Dashboard() {
         fullData: p
       };
     }).sort((a, b) => b.count - a.count);
-  }, [petugasData, kegiatanData]);
+  }, [petugasData, filteredActivitiesForChart]);
 
   const selectedActivities = useMemo(() => {
     if (selectedStat) {
@@ -141,8 +187,8 @@ export default function Dashboard() {
       }
     }
     if (!selectedPetugas) return [];
-    return kegiatanData.filter(k => k.petugasId === selectedPetugas.id);
-  }, [selectedPetugas, selectedStat, kegiatanData]);
+    return filteredActivitiesForChart.filter(k => k.petugasId === selectedPetugas.id);
+  }, [selectedPetugas, selectedStat, kegiatanData, filteredActivitiesForChart]);
 
   const statCards = [
     { label: 'Total Petugas', value: stats.totalPetugas, icon: Users, color: 'text-indigo-600' },
@@ -293,10 +339,48 @@ export default function Dashboard() {
           animate={{ opacity: 1, x: 0 }}
           className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[450px]"
         >
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-50/50">
             <div>
               <h3 className="font-bold text-slate-700">Rekapitulasi Kegiatan Petugas</h3>
               <p className="text-xs text-slate-500">Klik batang grafik untuk melihat detail kegiatan</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mr-1 select-none">Bulan:</span>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => {
+                    setSelectedMonth(parseInt(e.target.value, 10));
+                    setSelectedPetugas(null);
+                  }}
+                  className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer border-none p-0 pr-6"
+                >
+                  {months.map((m, idx) => (
+                    <option key={m} value={idx}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mr-1 select-none">Tahun:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => {
+                    setSelectedYear(e.target.value);
+                    setSelectedPetugas(null);
+                  }}
+                  className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer border-none p-0 pr-6"
+                >
+                  <option value="all">Semua Tahun</option>
+                  {availableYears.map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                  {!availableYears.includes(new Date().getFullYear().toString()) && (
+                    <option value={new Date().getFullYear().toString()}>{new Date().getFullYear().toString()}</option>
+                  )}
+                </select>
+              </div>
             </div>
           </div>
           
