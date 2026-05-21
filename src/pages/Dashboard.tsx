@@ -13,7 +13,8 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Cell
+  Cell,
+  LabelList
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -389,7 +390,7 @@ export default function Dashboard() {
               <BarChart
                 data={chartData}
                 layout="vertical"
-                margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                margin={{ top: 5, right: 45, left: 40, bottom: 5 }}
                 onClick={(e: any) => {
                   if (e && e.activePayload && e.activePayload[0]) {
                     handleBarClick(e.activePayload[0].payload);
@@ -429,6 +430,12 @@ export default function Dashboard() {
                       className="hover:fill-indigo-500 transition-colors duration-300"
                     />
                   ))}
+                  <LabelList 
+                    dataKey="count" 
+                    position="right" 
+                    offset={10} 
+                    style={{ fill: '#475569', fontSize: 11, fontWeight: 'bold' }} 
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
