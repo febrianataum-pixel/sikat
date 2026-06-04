@@ -1249,12 +1249,41 @@ export default function KegiatanPage() {
                   </button>
                 </div>
               </div>
-              <div className="flex-1 bg-slate-800 flex items-center justify-center p-4">
-                <iframe
-                  src={`${previewUrl}#toolbar=0`}
-                  className="w-full h-full rounded-lg shadow-inner bg-white"
-                  title="PDF Preview"
-                />
+              <div className="flex-1 bg-slate-800 flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto">
+                {/* Desktop View */}
+                <div className="hidden md:block w-full h-full">
+                  <iframe
+                    src={`${previewUrl}#toolbar=0`}
+                    className="w-full h-full rounded-2xl shadow-inner bg-white"
+                    title="PDF Preview"
+                  />
+                </div>
+                
+                {/* Mobile View / Fallback */}
+                <div className="md:hidden w-full max-w-sm my-auto flex flex-col items-center justify-center text-center p-6 bg-slate-900/40 rounded-3xl border border-slate-700/50">
+                  <div className="w-16 h-16 bg-slate-700/50 rounded-2xl flex items-center justify-center text-indigo-400 mb-4 shadow-lg border border-slate-600/30">
+                    <FileIcon size={28} />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wide">Pratinjau PDF di Ponsel</h4>
+                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                    Sistem operasi smartphone membatasi pratinjau PDF langsung di dalam frame. Silakan ketuk tombol di bawah untuk membuka atau mengunduh dokumen.
+                  </p>
+                  
+                  <div className="mt-6 flex flex-col gap-2.5 w-full">
+                    <button
+                      onClick={() => window.open(previewUrl || '', '_blank')}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-2xl text-[11px] uppercase tracking-wider shadow-lg shadow-indigo-600/10 transition-all"
+                    >
+                      Buka Dokumen di Tab Baru
+                    </button>
+                    <button
+                      onClick={() => handleDownloadDoc(selectedKegiatanForDownload, previewType === 'sppd' ? 'sppd_depan' : previewType)}
+                      className="w-full py-3 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 font-bold rounded-2xl text-[11px] uppercase tracking-wider border border-slate-600/50 transition-all"
+                    >
+                      Unduh Berkas PDF
+                    </button>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
