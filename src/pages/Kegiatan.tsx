@@ -15,11 +15,10 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatDate, cn } from '../lib/utils';
+import { formatDate, cn, compressImage } from '../lib/utils';
 import { generateSppdDepan, generateSpt, generateRincianBiaya, generateLaporanHasilPerjalanan, generateDokumentasi } from '../services/pdfService';
 import { DEFAULT_LOGO } from '../constants';
 import { useUserRole } from '../hooks/useUserRole';
-import imageCompression from 'browser-image-compression';
 
 interface Petugas {
   id: string;
@@ -473,25 +472,11 @@ export default function KegiatanPage() {
     }
 
     try {
-      if (onProgress) onProgress(`Memproses...`);
-      
-      const options = {
-        maxSizeMB: 0.15, // Keep it small for Firestore (Base64 is larger)
-        maxWidthOrHeight: 1024,
-        useWebWorker: true,
-        maxIteration: 10
-      };
-
-      const compressedFile = await imageCompression(file, options);
-      
-      if (onProgress) onProgress(`Mengonversi...`);
-      
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(compressedFile);
-      });
+      if (onProgress) onProgress(`Kompresi...`);
+      // Auto compress the image using HTML5 Canvas (high compatibility inside iframes/mobile)
+      const base64 = await compressImage(file, 1024, 0.6);
+      if (onProgress) onProgress(`Selesai`);
+      return base64;
     } catch (error: any) {
       console.error("[Upload] ERROR:", error);
       throw new Error(error.message || "Gagal memproses foto.");
@@ -780,18 +765,25 @@ export default function KegiatanPage() {
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nomor Surat / SPT</label>
-                  <div className="flex items-center bg-slate-50 border border-slate-200 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:bg-white transition-all">
-                    <span className="px-3 py-2 text-slate-400 font-bold text-sm bg-slate-100 border-r border-slate-200">000.1.2.3 /</span>
+                  <div className={cn(
+                    "flex items-center border rounded-md overflow-hidden transition-all",
+                    role === 'petugas' 
+                      ? "bg-slate-100 border-slate-200 text-slate-500" 
+                      : "bg-slate-50 border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:bg-white"
+                  )}>
+                    <span className="px-3 py-2 text-slate-400 font-bold text-sm bg-slate-100/50 border-r border-slate-200">000.1.2.3 /</span>
                     <input
                       type="text"
-                      className="flex-1 px-4 py-2 bg-transparent outline-none text-sm font-bold text-slate-800"
+                      disabled={role === 'petugas'}
+                      className="flex-1 px-4 py-2 bg-transparent outline-none text-sm font-bold text-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed"
                       placeholder="Input Nomor"
                       value={currentKegiatan?.nomorUrut || ''}
                       onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, nomorUrut: e.target.value })}
                     />
                     <span className="px-2 py-2 text-slate-400 font-bold text-sm">/</span>
                     <select
-                      className="px-3 py-2 bg-transparent outline-none text-sm font-bold text-slate-800 border-l border-slate-200 cursor-pointer"
+                      disabled={role === 'petugas'}
+                      className="px-3 py-2 bg-transparent outline-none text-sm font-bold text-slate-800 border-l border-slate-200 cursor-pointer disabled:text-slate-500 disabled:cursor-not-allowed"
                       value={currentKegiatan?.tahun || new Date().getFullYear()}
                       onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, tahun: e.target.value })}
                     >
@@ -821,7 +813,8 @@ export default function KegiatanPage() {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
                       <input
                         type="number"
-                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm"
+                        disabled={role === 'petugas'}
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                         placeholder="0"
                         value={currentKegiatan?.biayaTransport || ''}
                         onChange={(e) => setCurrentKegiatan({ ...currentKegiatan, biayaTransport: Number(e.target.value) })}

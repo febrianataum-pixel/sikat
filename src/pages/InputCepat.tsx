@@ -19,10 +19,9 @@ import {
   Camera
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, compressImage } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../hooks/useUserRole';
-import imageCompression from 'browser-image-compression';
 
 interface Petugas {
   id: string;
@@ -118,21 +117,11 @@ export default function InputCepat() {
     }
 
     try {
-      if (onProgress) onProgress(`Proses...`);
-      const options = {
-        maxSizeMB: 0.15,
-        maxWidthOrHeight: 1024,
-        useWebWorker: true,
-        maxIteration: 10
-      };
-      const compressedFile = await imageCompression(file, options);
-      if (onProgress) onProgress(`Konversi...`);
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(compressedFile);
-      });
+      if (onProgress) onProgress(`Kompresi...`);
+      // Auto compress the image using HTML5 Canvas (high compatibility inside iframes/mobile)
+      const base64 = await compressImage(file, 1024, 0.6);
+      if (onProgress) onProgress(`Selesai`);
+      return base64;
     } catch (error: any) {
       console.error("[Upload] ERROR:", error);
       throw new Error(error.message || "Gagal memproses foto.");
