@@ -487,30 +487,44 @@ export default function KegiatanPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight text-slate-800">Log Kegiatan Harian</h2>
-        {role !== 'petugas' && (
-          <button
-            onClick={() => {
-              const defaultPetugasId = (role === 'petugas' && userProfile?.petugasId) ? userProfile.petugasId : '';
-              let defaultSub = '';
-              if (role === 'petugas' && subKegiatan.length > 0) {
-                const targetSub = subKegiatan.find(s => s.nama.toLowerCase().includes('peningkatan kemampuan potensi sumber kesejahteraan sosial'));
-                if (targetSub) defaultSub = targetSub.id;
+        <button
+          onClick={() => {
+            let defaultPetugasId = '';
+            if (role === 'petugas') {
+              if (userProfile?.petugasId) {
+                defaultPetugasId = userProfile.petugasId;
+              } else {
+                const found = petugas.find(p => 
+                  p.nama.toLowerCase() === userProfile?.name?.toLowerCase() ||
+                  p.nama.toLowerCase() === auth.currentUser?.displayName?.toLowerCase()
+                );
+                if (found) defaultPetugasId = found.id;
               }
-              setCurrentKegiatan({ 
-                tanggal: new Date().toISOString().split('T')[0], 
-                laporanSelesai: false,
-                tahun: new Date().getFullYear().toString(),
-                petugasId: defaultPetugasId,
-                subKegiatanId: defaultSub
-              });
-              setIsModalOpen(true);
-            }}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors"
-          >
-            <Plus size={18} />
-            Input Kegiatan
-          </button>
-        )}
+            }
+            
+            let defaultSub = '';
+            if (subKegiatan.length > 0) {
+              const targetSub = subKegiatan.find(s => s.nama.toLowerCase().includes('peningkatan kemampuan potensi sumber kesejahteraan sosial'));
+              if (targetSub) {
+                defaultSub = targetSub.id;
+              } else {
+                defaultSub = subKegiatan[0].id;
+              }
+            }
+            setCurrentKegiatan({ 
+              tanggal: new Date().toISOString().split('T')[0], 
+              laporanSelesai: false,
+              tahun: new Date().getFullYear().toString(),
+              petugasId: defaultPetugasId,
+              subKegiatanId: defaultSub
+            });
+            setIsModalOpen(true);
+          }}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors"
+        >
+          <Plus size={18} />
+          Input Kegiatan
+        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
