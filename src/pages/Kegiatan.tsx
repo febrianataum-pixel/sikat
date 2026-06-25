@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, getDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { 
   Plus, 
@@ -184,7 +184,7 @@ export default function KegiatanPage() {
 
       const fullNomor = currentKegiatan.nomorUrut || '';
 
-      const data = {
+      const { dokumentasi, ...dataWithoutDokumentasi } = {
         petugasId: currentKegiatan.petugasId,
         petugasNama: pNama,
         nomor: fullNomor,
@@ -207,13 +207,19 @@ export default function KegiatanPage() {
       };
 
       if (currentKegiatan.id) {
-        await updateDoc(doc(db, 'kegiatan', currentKegiatan.id), data);
+        await Promise.all([
+          updateDoc(doc(db, 'kegiatan', currentKegiatan.id), dataWithoutDokumentasi),
+          setDoc(doc(db, 'kegiatan_docs', currentKegiatan.id), { dokumentasi: dokumentasi || [] }, { merge: true })
+        ]);
       } else {
-        await addDoc(collection(db, 'kegiatan'), {
-          ...data,
+        const docRef = await addDoc(collection(db, 'kegiatan'), {
+          ...dataWithoutDokumentasi,
           createdAt: new Date().toISOString(),
           createdByEmail: auth.currentUser?.email || 'N/A',
           createdByNama: userProfile?.name || auth.currentUser?.displayName || 'User'
+        });
+        await setDoc(doc(db, 'kegiatan_docs', docRef.id), {
+          dokumentasi: dokumentasi || []
         });
       }
 
@@ -246,16 +252,28 @@ export default function KegiatanPage() {
     return items.filter(item => item.nominal > 0);
   };
 
-  const handleDownloadDoc = (k: Kegiatan, label: string) => {
+  const handleDownloadDoc = async (k: Kegiatan, label: string) => {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return;
+
+    let activeDokumentasi = k.dokumentasi || [];
+    if ((label === 'hasil' || label === 'dokumentasi') && activeDokumentasi.length === 0 && k.hasDokumentasi && k.id) {
+      try {
+        const docSnap = await getDoc(doc(db, 'kegiatan_docs', k.id));
+        if (docSnap.exists()) {
+          activeDokumentasi = (docSnap.data() as any).dokumentasi || [];
+        }
+      } catch (e) {
+        console.error("Error lazy loading documentation:", e);
+      }
+    }
 
     const ppkOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('PPK')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'PEJABAT PEMBUAT KOMITMEN' };
     const bendaharaOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('BENDAHARA')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'BENDAHARA PENGELUARAN PEMBANTU' };
 
-    let doc;
+    let pdfDoc;
     if (label === 'sppd_depan') {
-      doc = generateSppdDepan({
+      pdfDoc = generateSppdDepan({
         nomorSppd: k.nomor,
         tahun: k.tahun,
         petugas: {
@@ -276,10 +294,10 @@ export default function KegiatanPage() {
         logoUrl: settings?.logoUrl,
         subKegiatan: subKegiatan.find(s => s.id === k.subKegiatanId)?.nama
       });
-      doc.save(`SPPD_${k.petugasNama}_${k.tanggal}.pdf`);
+      pdfDoc.save(`SPPD_${k.petugasNama}_${k.tanggal}.pdf`);
     } else if (label === 'spt') {
       const kadisOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA DINAS')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Kepala Dinas' };
-      doc = generateSpt({
+      pdfDoc = generateSpt({
         nomorSpt: k.nomor,
         tahun: k.tahun,
         dasarHukum: settings?.dasarHukum || [],
@@ -298,12 +316,12 @@ export default function KegiatanPage() {
           pangkat: (kadisOfficial as any).pangkat || '-'
         }
       });
-      doc.save(`SPT_${k.petugasNama}_${k.tanggal}.pdf`);
+      pdfDoc.save(`SPT_${k.petugasNama}_${k.tanggal}.pdf`);
     } else if (label === 'biaya') {
       const rincian = calculateRincian(k);
       if (!rincian) return;
 
-      doc = generateRincianBiaya({
+      pdfDoc = generateRincianBiaya({
         nomorSppd: k.nomor,
         tahun: k.tahun,
         tanggalSpt: k.tanggal,
@@ -321,9 +339,9 @@ export default function KegiatanPage() {
           nip: bendaharaOfficial.nip
         }
       });
-      doc.save(`RINCIAN_${k.petugasNama}_${k.tanggal}.pdf`);
+      pdfDoc.save(`RINCIAN_${k.petugasNama}_${k.tanggal}.pdf`);
     } else if (label === 'hasil') {
-      doc = generateLaporanHasilPerjalanan({
+      pdfDoc = generateLaporanHasilPerjalanan({
         nomorSpt: k.nomor,
         tahun: k.tahun,
         tanggalSpt: k.tanggal,
@@ -331,34 +349,46 @@ export default function KegiatanPage() {
         tempat: k.tempat,
         petugas: { nama: k.petugasNama },
         hasil: k.hasilPerjalanan || [],
-        dokumentasi: k.dokumentasi || [],
+        dokumentasi: activeDokumentasi,
         logoUrl: settings?.logoUrl
       });
-      doc.save(`HASIL_LAPORAN_${k.petugasNama}_${k.tanggal}.pdf`);
+      pdfDoc.save(`HASIL_LAPORAN_${k.petugasNama}_${k.tanggal}.pdf`);
     } else if (label === 'dokumentasi') {
-      doc = generateDokumentasi({
+      pdfDoc = generateDokumentasi({
         maksud: k.uraian,
         tempat: k.tempat,
         tanggal: k.tanggal,
-        dokumentasi: k.dokumentasi || []
+        dokumentasi: activeDokumentasi
       });
-      doc.save(`DOKUMENTASI_${k.petugasNama}_${k.tanggal}.pdf`);
+      pdfDoc.save(`DOKUMENTASI_${k.petugasNama}_${k.tanggal}.pdf`);
     } else {
       alert(`Sedang menyiapkan dokumen: ${label}`);
     }
   };
 
-  const handlePreviewDoc = (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil' | 'dokumentasi') => {
+  const handlePreviewDoc = async (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil' | 'dokumentasi') => {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return;
+
+    let activeDokumentasi = k.dokumentasi || [];
+    if ((type === 'hasil' || type === 'dokumentasi') && activeDokumentasi.length === 0 && k.hasDokumentasi && k.id) {
+      try {
+        const docSnap = await getDoc(doc(db, 'kegiatan_docs', k.id));
+        if (docSnap.exists()) {
+          activeDokumentasi = (docSnap.data() as any).dokumentasi || [];
+        }
+      } catch (e) {
+        console.error("Error lazy loading preview documentation:", e);
+      }
+    }
 
     const ppkOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('PPK')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'PEJABAT PEMBUAT KOMITMEN' };
     const bendaharaOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('BENDAHARA')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'BENDAHARA PENGELUARAN PEMBANTU' };
 
-    let doc;
+    let pdfDoc;
     if (type === 'sppd') {
       setPreviewType('sppd');
-      doc = generateSppdDepan({
+      pdfDoc = generateSppdDepan({
         nomorSppd: k.nomor,
         tahun: k.tahun,
         petugas: {
@@ -382,7 +412,7 @@ export default function KegiatanPage() {
     } else if (type === 'spt') {
       setPreviewType('spt');
       const kadisOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA DINAS')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Kepala Dinas' };
-      doc = generateSpt({
+      pdfDoc = generateSpt({
         nomorSpt: k.nomor,
         tahun: k.tahun,
         dasarHukum: settings?.dasarHukum || [],
@@ -406,7 +436,7 @@ export default function KegiatanPage() {
       const rincian = calculateRincian(k);
       if (!rincian) return;
 
-      doc = generateRincianBiaya({
+      pdfDoc = generateRincianBiaya({
         nomorSppd: k.nomor,
         tahun: k.tahun,
         tanggalSpt: k.tanggal,
@@ -426,7 +456,7 @@ export default function KegiatanPage() {
       });
     } else if (type === 'hasil') {
       setPreviewType('hasil');
-      doc = generateLaporanHasilPerjalanan({
+      pdfDoc = generateLaporanHasilPerjalanan({
         nomorSpt: k.nomor,
         tahun: k.tahun,
         tanggalSpt: k.tanggal,
@@ -434,20 +464,20 @@ export default function KegiatanPage() {
         tempat: k.tempat,
         petugas: { nama: k.petugasNama },
         hasil: k.hasilPerjalanan || [],
-        dokumentasi: k.dokumentasi || [],
+        dokumentasi: activeDokumentasi,
         logoUrl: settings?.logoUrl
       });
     } else if (type === 'dokumentasi') {
       setPreviewType('dokumentasi');
-      doc = generateDokumentasi({
+      pdfDoc = generateDokumentasi({
         maksud: k.uraian,
         tempat: k.tempat,
         tanggal: k.tanggal,
-        dokumentasi: k.dokumentasi || []
+        dokumentasi: activeDokumentasi
       });
     }
 
-    const blobUrl = doc.output('bloburl');
+    const blobUrl = pdfDoc.output('bloburl');
     setPreviewUrl(blobUrl);
     setPreviewType(type);
     setSelectedKegiatanForDownload(k);
@@ -638,8 +668,19 @@ export default function KegiatanPage() {
                   </td>
                   <td className="px-6 py-4 text-right space-x-1">
                     <button
-                      onClick={() => {
-                        setCurrentKegiatan(k);
+                      onClick={async () => {
+                        let activeDocs = k.dokumentasi || [];
+                        if (activeDocs.length === 0 && k.hasDokumentasi && k.id) {
+                          try {
+                            const docSnap = await getDoc(doc(db, 'kegiatan_docs', k.id));
+                            if (docSnap.exists()) {
+                              activeDocs = docSnap.data().dokumentasi || [];
+                            }
+                          } catch (e) {
+                            console.error("Error loading edit documentation:", e);
+                          }
+                        }
+                        setCurrentKegiatan({ ...k, dokumentasi: activeDocs });
                         setIsModalOpen(true);
                       }}
                       className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"

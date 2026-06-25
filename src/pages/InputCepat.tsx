@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { 
   Send, 
@@ -139,11 +139,14 @@ export default function InputCepat() {
     try {
       const pNama = petugas.find(p => p.id === formData.petugasId)?.nama || '';
       
-      await addDoc(collection(db, 'kegiatan'), {
-        ...formData,
+      // Omit dokumentasi from main document to keep it extremely light
+      const { dokumentasi, ...kegiatanData } = formData;
+      
+      const docRef = await addDoc(collection(db, 'kegiatan'), {
+        ...kegiatanData,
         petugasNama: pNama,
         hasLaporan: false,
-        hasDokumentasi: formData.dokumentasi.length > 0,
+        hasDokumentasi: dokumentasi.length > 0,
         hasSppd: false,
         laporanSelesai: false,
         nomor: '',
@@ -153,6 +156,11 @@ export default function InputCepat() {
         updatedAt: new Date().toISOString(),
         createdByEmail: auth.currentUser?.email || 'N/A',
         createdByNama: userProfile?.name || auth.currentUser?.displayName || 'User'
+      });
+
+      // Save documentation separately under same ID
+      await setDoc(doc(db, 'kegiatan_docs', docRef.id), {
+        dokumentasi: dokumentasi || []
       });
 
       setSuccess(true);

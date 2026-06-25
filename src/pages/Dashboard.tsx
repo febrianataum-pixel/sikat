@@ -78,7 +78,10 @@ export default function Dashboard() {
   const [selectedYear, setSelectedYear] = useState<string>('all');
 
   useEffect(() => {
+    if (roleLoading || !role) return;
+
     async function fetchData() {
+      setLoading(true);
       try {
         const [petugasSnap, activitiesSnap] = await Promise.all([
           getDocs(collection(db, 'petugas')),
@@ -132,7 +135,7 @@ export default function Dashboard() {
       }
     }
     fetchData();
-  }, []);
+  }, [role, roleLoading, userProfile]);
 
   const availableYears = useMemo(() => {
     const years = new Set<string>();
