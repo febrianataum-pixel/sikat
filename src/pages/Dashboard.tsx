@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, where, doc, updateDoc, setDoc, deleteField } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { Users, Calendar, CheckCircle2, ListTodo, FileText, ChevronRight, X, ArrowLeft, Smartphone, PlusCircle, UserCircle } from 'lucide-react';
 import { formatDate } from '../lib/utils';
@@ -83,20 +83,36 @@ export default function Dashboard() {
     async function fetchData() {
       setLoading(true);
       try {
+        const currentPetugasId = userProfile?.petugasId;
+        
+        let kegiatanQuery;
+        if (role === 'petugas' && currentPetugasId) {
+          kegiatanQuery = query(
+            collection(db, 'kegiatan'),
+            where('petugasId', '==', currentPetugasId)
+          );
+        } else {
+          kegiatanQuery = query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc'));
+        }
+
         const [petugasSnap, activitiesSnap] = await Promise.all([
           getDocs(collection(db, 'petugas')),
-          getDocs(query(collection(db, 'kegiatan'), orderBy('tanggal', 'desc')))
+          getDocs(kegiatanQuery)
         ]);
         
-        const petugas = petugasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Petugas));
-        const kegiatan = activitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kegiatan));
+        const petugas = petugasSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as Petugas));
+        let kegiatan = activitiesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as Kegiatan));
+        
+        // Sort in memory if queried with petugasId without orderBy to avoid index requirement issues
+        if (role === 'petugas' && currentPetugasId) {
+          kegiatan.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+        }
         
         setPetugasData(petugas);
         
         let filteredKegiatan = kegiatan;
         if (role === 'petugas') {
           const currentUserEmail = auth.currentUser?.email;
-          const currentPetugasId = userProfile?.petugasId;
           const currentUserName = userProfile?.name;
 
           filteredKegiatan = kegiatan.filter(k => 
@@ -107,6 +123,40 @@ export default function Dashboard() {
         }
         
         setKegiatanData(filteredKegiatan);
+
+        // Perform self-healing background optimization to clean up heavy inline base64 images
+        const heavyDocs = activitiesSnap.docs.filter(d => {
+          const data = d.data() as any;
+          return data.dokumentasi && Array.isArray(data.dokumentasi) && data.dokumentasi.length > 0;
+        });
+
+        if (heavyDocs.length > 0) {
+          const limit = Math.min(heavyDocs.length, 2);
+          console.log(`[Optimization] Found ${heavyDocs.length} heavy documents. Migrating ${limit} sequentially to prevent write stream exhaustion...`);
+          
+          (async () => {
+            for (let i = 0; i < limit; i++) {
+              const d = heavyDocs[i];
+              const id = d.id;
+              const data = d.data() as any;
+              try {
+                // 1. Write to separate collection
+                await setDoc(doc(db, 'kegiatan_docs', id), {
+                  dokumentasi: data.dokumentasi
+                }, { merge: true });
+                // 2. Remove from main collection
+                await updateDoc(doc(db, 'kegiatan', id), {
+                  dokumentasi: deleteField()
+                });
+                console.log(`[Optimization] Document ${id} successfully migrated.`);
+                // Sleep for 500ms between writes
+                await new Promise(resolve => setTimeout(resolve, 500));
+              } catch (err) {
+                console.error(`[Optimization] Failed to migrate doc ${id}:`, err);
+              }
+            }
+          })();
+        }
 
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
