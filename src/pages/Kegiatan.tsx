@@ -76,6 +76,15 @@ const indonesianMonths: { [key: string]: string } = {
   '12': 'desember'
 };
 
+const generateCaptcha = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 5; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
 export default function KegiatanPage() {
   const [kegiatan, setKegiatan] = useState<Kegiatan[]>([]);
   const [petugas, setPetugas] = useState<Petugas[]>([]);
@@ -103,6 +112,13 @@ export default function KegiatanPage() {
   const [zipMonth, setZipMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
   const [zipLoading, setZipLoading] = useState(false);
   const [zipProgress, setZipProgress] = useState('');
+
+  const [isDeleteMonthModalOpen, setIsDeleteMonthModalOpen] = useState(false);
+  const [deleteMonthSelect, setDeleteMonthSelect] = useState(new Date().toISOString().substring(0, 7));
+  const [captchaCode, setCaptchaCode] = useState('');
+  const [deleteMonthCaptchaInput, setDeleteMonthCaptchaInput] = useState('');
+  const [deleteMonthLoading, setDeleteMonthLoading] = useState(false);
+  const [deleteMonthProgress, setDeleteMonthProgress] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
@@ -574,6 +590,48 @@ export default function KegiatanPage() {
     }
   };
 
+  const handleDeleteMonth = async () => {
+    if (deleteMonthLoading) return;
+
+    // Verify captcha
+    if (deleteMonthCaptchaInput.trim().toUpperCase() !== captchaCode.toUpperCase()) {
+      alert('Kode verifikasi (captcha) tidak cocok. Silakan coba lagi.');
+      return;
+    }
+
+    const toDelete = kegiatan.filter(k => k.tanggal.startsWith(deleteMonthSelect));
+
+    if (toDelete.length === 0) {
+      alert('Tidak ada kegiatan yang ditemukan pada bulan yang dipilih.');
+      return;
+    }
+
+    setDeleteMonthLoading(true);
+    setDeleteMonthProgress('Memulai proses penghapusan...');
+
+    try {
+      for (let i = 0; i < toDelete.length; i++) {
+        const k = toDelete[i];
+        setDeleteMonthProgress(`Menghapus kegiatan [${i + 1}/${toDelete.length}]: ${k.petugasNama}...`);
+        
+        // Delete main document
+        await deleteDoc(doc(db, 'kegiatan', k.id));
+        // Delete documentation document
+        await deleteDoc(doc(db, 'kegiatan_docs', k.id));
+      }
+
+      alert(`Berhasil menghapus ${toDelete.length} kegiatan.`);
+      setIsDeleteMonthModalOpen(false);
+      fetchData();
+    } catch (error) {
+      console.error("Gagal menghapus kegiatan bulanan:", error);
+      alert('Terjadi kesalahan saat menghapus kegiatan. Silakan coba lagi.');
+    } finally {
+      setDeleteMonthLoading(false);
+      setDeleteMonthProgress('');
+    }
+  };
+
   const handlePreviewDoc = async (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil' | 'dokumentasi') => {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return;
@@ -727,16 +785,30 @@ export default function KegiatanPage() {
         <h2 className="text-xl font-bold tracking-tight text-slate-800">Log Kegiatan Harian</h2>
         <div className="flex items-center gap-2">
           {role === 'admin' && (
-            <button
-              onClick={() => {
-                setZipMonth(new Date().toISOString().substring(0, 7));
-                setIsZipModalOpen(true);
-              }}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors cursor-pointer"
-            >
-              <Download size={18} />
-              Unduh Dokumen Bulanan
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  setZipMonth(new Date().toISOString().substring(0, 7));
+                  setIsZipModalOpen(true);
+                }}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+              >
+                <Download size={18} />
+                Unduh Dokumen Bulanan
+              </button>
+              <button
+                onClick={() => {
+                  setDeleteMonthSelect(new Date().toISOString().substring(0, 7));
+                  setCaptchaCode(generateCaptcha());
+                  setDeleteMonthCaptchaInput('');
+                  setIsDeleteMonthModalOpen(true);
+                }}
+                className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+              >
+                <Trash2 size={18} />
+                Hapus Kegiatan Bulanan
+              </button>
+            </>
           )}
           <button
             onClick={() => {
@@ -1670,6 +1742,118 @@ export default function KegiatanPage() {
                     >
                       <Download size={16} />
                       Unduh ZIP
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isDeleteMonthModalOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { if (!deleteMonthLoading) setIsDeleteMonthModalOpen(false); }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-white rounded-xl shadow-2xl p-6 border border-slate-200"
+            >
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Trash2 className="text-rose-600" size={20} />
+                  Hapus Kegiatan Bulanan (Admin)
+                </h3>
+                {!deleteMonthLoading && (
+                  <button 
+                    onClick={() => setIsDeleteMonthModalOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+
+              {deleteMonthLoading ? (
+                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                  <Loader2 className="animate-spin text-rose-600" size={36} />
+                  <p className="text-sm font-bold text-slate-700 text-center">{deleteMonthProgress || "Sedang menghapus..."}</p>
+                  <p className="text-xs text-slate-400 italic text-center max-w-xs">
+                    Sistem sedang menghapus data kegiatan. Mohon jangan menutup halaman ini hingga proses selesai.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs font-semibold leading-relaxed">
+                    ⚠️ PERINGATAN: Tindakan ini akan menghapus secara permanen seluruh kegiatan petugas pada bulan & tahun yang dipilih dari database, termasuk data dokumentasi pendukung.
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Pilih Bulan & Tahun</label>
+                    <input 
+                      type="month"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 outline-none transition-all font-semibold text-slate-700"
+                      value={deleteMonthSelect}
+                      onChange={(e) => setDeleteMonthSelect(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2 border-t border-slate-100 pt-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Kode Verifikasi (Captcha)</label>
+                      <button 
+                        type="button"
+                        onClick={() => setCaptchaCode(generateCaptcha())}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                      >
+                        Ganti Kode
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center justify-center py-3 bg-slate-50 border border-slate-200 rounded-lg select-none">
+                      <span className="text-xl font-mono font-black tracking-widest text-slate-700 select-none bg-linear-to-r from-rose-600 to-indigo-600 bg-clip-text text-transparent italic px-4 py-1.5 border border-dashed border-slate-300 rounded shadow-xs">
+                        {captchaCode}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-500 font-medium">Ketik kode di atas untuk mengonfirmasi penghapusan:</p>
+                    <input 
+                      type="text"
+                      maxLength={5}
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-mono font-bold focus:ring-2 focus:ring-rose-500 outline-none transition-all uppercase tracking-widest text-center text-slate-700 placeholder:text-slate-300"
+                      placeholder="Ketik kode captcha"
+                      value={deleteMonthCaptchaInput}
+                      onChange={(e) => setDeleteMonthCaptchaInput(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-slate-100">
+                    <button
+                      onClick={() => setIsDeleteMonthModalOpen(false)}
+                      className="flex-1 px-4 py-2 border border-slate-200 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={handleDeleteMonth}
+                      disabled={deleteMonthCaptchaInput.trim().toUpperCase() !== captchaCode.toUpperCase()}
+                      className={cn(
+                        "flex-1 px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-white",
+                        deleteMonthCaptchaInput.trim().toUpperCase() === captchaCode.toUpperCase()
+                          ? "bg-rose-600 hover:bg-rose-700"
+                          : "bg-slate-300 cursor-not-allowed text-slate-400"
+                      )}
+                    >
+                      <Trash2 size={16} />
+                      Hapus Permanen
                     </button>
                   </div>
                 </div>
