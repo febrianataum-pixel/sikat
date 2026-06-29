@@ -19,6 +19,7 @@ import { formatDate, cn, compressImage } from '../lib/utils';
 import { generateSppdDepan, generateSpt, generateRincianBiaya, generateLaporanHasilPerjalanan, generateDokumentasi } from '../services/pdfService';
 import { DEFAULT_LOGO } from '../constants';
 import { useUserRole } from '../hooks/useUserRole';
+import JSZip from 'jszip';
 
 interface Petugas {
   id: string;
@@ -60,6 +61,21 @@ interface SubKegiatan {
   nama: string;
 }
 
+const indonesianMonths: { [key: string]: string } = {
+  '01': 'januari',
+  '02': 'februari',
+  '03': 'maret',
+  '04': 'april',
+  '05': 'mei',
+  '06': 'juni',
+  '07': 'juli',
+  '08': 'agustus',
+  '09': 'september',
+  '10': 'oktober',
+  '11': 'november',
+  '12': 'desember'
+};
+
 export default function KegiatanPage() {
   const [kegiatan, setKegiatan] = useState<Kegiatan[]>([]);
   const [petugas, setPetugas] = useState<Petugas[]>([]);
@@ -82,6 +98,11 @@ export default function KegiatanPage() {
   const [subKegiatan, setSubKegiatan] = useState<SubKegiatan[]>([]);
   const [biayaPerjalanan, setBiayaPerjalanan] = useState<{ id: string, tingkat: string, jenis: string, nominal: number }[]>([]);
   const [bbm, setBbm] = useState<{ id: string, jenis: string, harga: number }[]>([]);
+
+  const [isZipModalOpen, setIsZipModalOpen] = useState(false);
+  const [zipMonth, setZipMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipProgress, setZipProgress] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
@@ -377,6 +398,182 @@ export default function KegiatanPage() {
     }
   };
 
+  const handleDownloadZip = async () => {
+    if (zipLoading) return;
+    setZipLoading(true);
+    setZipProgress('Memulai proses...');
+
+    try {
+      const activitiesForMonth = kegiatan.filter(k => k.tanggal.startsWith(zipMonth));
+
+      if (activitiesForMonth.length === 0) {
+        alert('Tidak ada data kegiatan pada bulan tersebut.');
+        setZipLoading(false);
+        return;
+      }
+
+      const zip = new JSZip();
+
+      // We'll iterate through each activity of the selected month
+      for (let index = 0; index < activitiesForMonth.length; index++) {
+        const k = activitiesForMonth[index];
+        const p = petugas.find(item => item.id === k.petugasId);
+        
+        // Find officials
+        const ppkOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('PPK')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'PEJABAT PEMBUAT KOMITMEN' };
+        const bendaharaOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('BENDAHARA')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'BENDAHARA PENGELUARAN PEMBANTU' };
+        const kadisOfficial = manajemen.find(m => m.jabatan.toUpperCase().includes('KEPALA DINAS')) || manajemen[0] || { nama: '-', nip: '-', jabatan: 'Kepala Dinas' };
+
+        // Lazy load documentation if needed
+        let activeDokumentasi = k.dokumentasi || [];
+        if (k.hasDokumentasi && activeDokumentasi.length === 0 && k.id) {
+          setZipProgress(`[${index + 1}/${activitiesForMonth.length}] Mengunduh dokumentasi: ${k.petugasNama}...`);
+          try {
+            const docSnap = await getDoc(doc(db, 'kegiatan_docs', k.id));
+            if (docSnap.exists()) {
+              activeDokumentasi = (docSnap.data() as any).dokumentasi || [];
+            }
+          } catch (e) {
+            console.error("Error loading documentation for zip:", e);
+          }
+        }
+
+        const formattedDate = formatDate(k.tanggal);
+
+        // 1. SPPD Depan
+        setZipProgress(`[${index + 1}/${activitiesForMonth.length}] Menghasilkan SPPD: ${k.petugasNama}...`);
+        const sppdPdf = generateSppdDepan({
+          nomorSppd: k.nomor,
+          tahun: k.tahun,
+          petugas: {
+            nama: k.petugasNama,
+            niat: (p as any)?.niat || '-',
+            jabatan: (p as any)?.jenis || '-',
+            tingkatSPPD: (p as any)?.tingkatSPPD || '-'
+          },
+          ppk: {
+            nama: ppkOfficial.nama,
+            nip: ppkOfficial.nip,
+            jabatan: ppkOfficial.jabatan
+          },
+          tanggal: formattedDate,
+          tempat: k.tempat,
+          uraian: k.uraian,
+          lamaPerjalanan: `${k.lamaPerjalanan || 1} Hari`,
+          logoUrl: settings?.logoUrl,
+          subKegiatan: subKegiatan.find(s => s.id === k.subKegiatanId)?.nama
+        });
+
+        // 2. SPT
+        setZipProgress(`[${index + 1}/${activitiesForMonth.length}] Menghasilkan SPT: ${k.petugasNama}...`);
+        const sptPdf = generateSpt({
+          nomorSpt: k.nomor,
+          tahun: k.tahun,
+          dasarHukum: settings?.dasarHukum || [],
+          petugas: {
+            nama: k.petugasNama,
+            niat: (p as any)?.niat,
+            jabatan: (p as any)?.jenis
+          },
+          maksud: k.uraian,
+          tempat: k.tempat,
+          tanggal: k.tanggal,
+          logoUrl: settings?.logoUrl,
+          kadis: {
+            nama: kadisOfficial.nama,
+            nip: kadisOfficial.nip,
+            pangkat: (kadisOfficial as any)?.pangkat || '-'
+          }
+        });
+
+        // 3. Rincian Biaya
+        let rincianPdf = null;
+        const rincian = calculateRincian(k);
+        if (rincian) {
+          setZipProgress(`[${index + 1}/${activitiesForMonth.length}] Menghasilkan Rincian Biaya: ${k.petugasNama}...`);
+          rincianPdf = generateRincianBiaya({
+            nomorSppd: k.nomor,
+            tahun: k.tahun,
+            tanggalSpt: k.tanggal,
+            petugas: {
+              nama: k.petugasNama,
+              tingkatSPPD: (p as any)?.tingkatSPPD || '-'
+            },
+            rincian: rincian,
+            ppk: {
+              nama: ppkOfficial.nama,
+              nip: ppkOfficial.nip
+            },
+            bendahara: {
+              nama: bendaharaOfficial.nama,
+              nip: bendaharaOfficial.nip
+            }
+          });
+        }
+
+        // 4. Laporan Hasil Perjalanan
+        setZipProgress(`[${index + 1}/${activitiesForMonth.length}] Menghasilkan Laporan Hasil: ${k.petugasNama}...`);
+        const hasilPdf = generateLaporanHasilPerjalanan({
+          nomorSpt: k.nomor,
+          tahun: k.tahun,
+          tanggalSpt: k.tanggal,
+          maksud: k.uraian,
+          tempat: k.tempat,
+          petugas: { nama: k.petugasNama },
+          hasil: k.hasilPerjalanan || [],
+          dokumentasi: activeDokumentasi,
+          logoUrl: settings?.logoUrl
+        });
+
+        // 5. Dokumentasi
+        setZipProgress(`[${index + 1}/${activitiesForMonth.length}] Menghasilkan Dokumentasi: ${k.petugasNama}...`);
+        const dokPdf = generateDokumentasi({
+          maksud: k.uraian,
+          tempat: k.tempat,
+          tanggal: k.tanggal,
+          dokumentasi: activeDokumentasi
+        });
+
+        // Create the folder hierarchy inside the zip
+        const folderName = k.petugasNama.trim();
+        const officerFolder = zip.folder(folderName);
+
+        if (officerFolder) {
+          // Add the files into the officer's folder
+          officerFolder.file(`1_SPPD_${k.tanggal}.pdf`, sppdPdf.output('blob'));
+          officerFolder.file(`2_SPT_${k.tanggal}.pdf`, sptPdf.output('blob'));
+          if (rincianPdf) {
+            officerFolder.file(`3_Rincian_Biaya_${k.tanggal}.pdf`, rincianPdf.output('blob'));
+          }
+          officerFolder.file(`4_Hasil_Laporan_${k.tanggal}.pdf`, hasilPdf.output('blob'));
+          officerFolder.file(`5_Dokumentasi_${k.tanggal}.pdf`, dokPdf.output('blob'));
+        }
+      }
+
+      setZipProgress('Mengemas seluruh berkas dokumen ke format ZIP...');
+      const content = await zip.generateAsync({ type: 'blob' });
+
+      const [year, month] = zipMonth.split('-');
+      const monthName = indonesianMonths[month] || month;
+      const zipFilename = `laporan_${monthName}${year}.zip`;
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      link.download = zipFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setIsZipModalOpen(false);
+    } catch (error) {
+      console.error("Gagal mengunduh ZIP:", error);
+      alert('Gagal membuat berkas ZIP. Silakan coba lagi.');
+    } finally {
+      setZipLoading(false);
+      setZipProgress('');
+    }
+  };
+
   const handlePreviewDoc = async (k: Kegiatan, type: 'sppd' | 'spt' | 'biaya' | 'hasil' | 'dokumentasi') => {
     const p = petugas.find(item => item.id === k.petugasId);
     if (!p) return;
@@ -528,44 +725,58 @@ export default function KegiatanPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight text-slate-800">Log Kegiatan Harian</h2>
-        <button
-          onClick={() => {
-            let defaultPetugasId = '';
-            if (role === 'petugas') {
-              if (userProfile?.petugasId) {
-                defaultPetugasId = userProfile.petugasId;
-              } else {
-                const found = petugas.find(p => 
-                  p.nama.toLowerCase() === userProfile?.name?.toLowerCase() ||
-                  p.nama.toLowerCase() === auth.currentUser?.displayName?.toLowerCase()
-                );
-                if (found) defaultPetugasId = found.id;
+        <div className="flex items-center gap-2">
+          {role === 'admin' && (
+            <button
+              onClick={() => {
+                setZipMonth(new Date().toISOString().substring(0, 7));
+                setIsZipModalOpen(true);
+              }}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+            >
+              <Download size={18} />
+              Unduh Dokumen Bulanan
+            </button>
+          )}
+          <button
+            onClick={() => {
+              let defaultPetugasId = '';
+              if (role === 'petugas') {
+                if (userProfile?.petugasId) {
+                  defaultPetugasId = userProfile.petugasId;
+                } else {
+                  const found = petugas.find(p => 
+                    p.nama.toLowerCase() === userProfile?.name?.toLowerCase() ||
+                    p.nama.toLowerCase() === auth.currentUser?.displayName?.toLowerCase()
+                  );
+                  if (found) defaultPetugasId = found.id;
+                }
               }
-            }
-            
-            let defaultSub = '';
-            if (subKegiatan.length > 0) {
-              const targetSub = subKegiatan.find(s => s.nama.toLowerCase().includes('peningkatan kemampuan potensi sumber kesejahteraan sosial'));
-              if (targetSub) {
-                defaultSub = targetSub.id;
-              } else {
-                defaultSub = subKegiatan[0].id;
+              
+              let defaultSub = '';
+              if (subKegiatan.length > 0) {
+                const targetSub = subKegiatan.find(s => s.nama.toLowerCase().includes('peningkatan kemampuan potensi sumber kesejahteraan sosial'));
+                if (targetSub) {
+                  defaultSub = targetSub.id;
+                } else {
+                  defaultSub = subKegiatan[0].id;
+                }
               }
-            }
-            setCurrentKegiatan({ 
-              tanggal: new Date().toISOString().split('T')[0], 
-              laporanSelesai: false,
-              tahun: new Date().getFullYear().toString(),
-              petugasId: defaultPetugasId,
-              subKegiatanId: defaultSub
-            });
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors"
-        >
-          <Plus size={18} />
-          Input Kegiatan
-        </button>
+              setCurrentKegiatan({ 
+                tanggal: new Date().toISOString().split('T')[0], 
+                laporanSelesai: false,
+                tahun: new Date().getFullYear().toString(),
+                petugasId: defaultPetugasId,
+                subKegiatanId: defaultSub
+              });
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+          >
+            <Plus size={18} />
+            Input Kegiatan
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
@@ -1386,6 +1597,83 @@ export default function KegiatanPage() {
                   Ya, Hapus
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isZipModalOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { if (!zipLoading) setIsZipModalOpen(false); }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-white rounded-xl shadow-2xl p-6 border border-slate-200"
+            >
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Download className="text-emerald-600" size={20} />
+                  Unduh Dokumen Bulanan (ZIP)
+                </h3>
+                {!zipLoading && (
+                  <button 
+                    onClick={() => setIsZipModalOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+
+              {zipLoading ? (
+                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                  <Loader2 className="animate-spin text-emerald-600" size={36} />
+                  <p className="text-sm font-bold text-slate-700 text-center">{zipProgress || "Sedang memproses..."}</p>
+                  <p className="text-xs text-slate-400 italic text-center max-w-xs">
+                    Sistem sedang menghasilkan berkas PDF untuk seluruh petugas pada bulan yang dipilih dan mengemasnya ke format ZIP. Jangan tutup jendela ini.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-slate-500">
+                    Silakan pilih bulan kegiatan yang ingin diunduh berkasnya. Seluruh dokumen (SPPD depan, SPT, rincian biaya, laporan hasil, dan dokumentasi) akan dikemas per folder nama petugas.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Pilih Bulan & Tahun</label>
+                    <input 
+                      type="month"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold text-slate-700"
+                      value={zipMonth}
+                      onChange={(e) => setZipMonth(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={() => setIsZipModalOpen(false)}
+                      className="flex-1 px-4 py-2 border border-slate-200 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={handleDownloadZip}
+                      className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download size={16} />
+                      Unduh ZIP
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
